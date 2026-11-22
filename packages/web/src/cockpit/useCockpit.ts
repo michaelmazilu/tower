@@ -26,6 +26,8 @@ export function useCockpit() {
   const r = useRef({
     alive: false,
     held: false,
+    /** The seq of the call the tower is answering. A press then would throw that answer away. */
+    sending: 0,
     seq: 0,
     runId: undefined as string | undefined,
     speaker: new Speaker(),
@@ -50,6 +52,7 @@ export function useCockpit() {
 
   const send = useCallback(async (path: string, body: Blob | string, type: string) => {
     const seq = ++r.seq;
+    r.sending = seq;
     r.speaker.stop();
     setPhase("thinking");
     setNote("");
@@ -61,6 +64,7 @@ export function useCockpit() {
     } catch {
       reply = { ok: false, message: "The tower did not answer. Try again, or type it." };
     }
+    if (r.sending === seq) r.sending = 0;
     if (!r.alive) return;
     // A newer press or a reset owns the radio now.
     if (seq !== r.seq) return void refresh();
@@ -145,7 +149,7 @@ export function useCockpit() {
   }, [r]);
 
   const press = useCallback(async () => {
-    if (r.held) return;
+    if (r.held || r.sending) return;
     r.held = true;
     r.speaker.stop();
     setPhase((p) => (p === "speaking" ? "idle" : p));
@@ -221,7 +225,7 @@ export function useCockpit() {
   }, [state, phase, r, heardCalls]);
 
   const say = (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || r.sending) return;
     // Cancels a recording still in progress: the newest thing said wins.
     r.seq++;
     release();
@@ -232,6 +236,7 @@ export function useCockpit() {
   const command = async (path: string, body: object = {}) => {
     if (path.endsWith("/reset")) {
       r.seq++;
+      r.sending = 0;
       release();
       r.speaker.stop();
       setPhase("idle");
