@@ -322,12 +322,16 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     }
     const ack = /^\/api\/ops\/alerts\/([^/]+)\/ack$/.exec(path);
     if (ack) return acted(res, host.ops.acknowledge(decoded(ack[1])));
-    const action = /^\/api\/ops\/flights\/([^/]+)\/(takeover|handback|instruct)$/.exec(path);
+    const action = /^\/api\/ops\/flights\/([^/]+)\/(takeover|handback|instruct|accept)$/.exec(path);
     if (action) {
       const id = decoded(action[1]);
       if (action[2] === "takeover") return acted(res, host.ops.takeover(id));
       if (action[2] === "handback") return acted(res, host.ops.handback(id));
       const body = await readJson(req);
+      if (action[2] === "accept") {
+        const steps = Array.isArray(body.steps) ? body.steps.filter((x): x is string => typeof x === "string").slice(0, 4) : [];
+        return acted(res, host.ops.accept(id, steps));
+      }
       const text = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : undefined);
       return acted(
         res,

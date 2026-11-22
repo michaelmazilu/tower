@@ -3,6 +3,7 @@ import type {
   ControlPosition,
   FlightRecord,
   FlightSummary,
+  HandoffBrief,
   Marker,
   Message,
   OperatorInstruction,
@@ -15,8 +16,10 @@ import {
   availableClearances,
   controlPosition,
   distanceToThreshold,
+  flyingSec,
   NM,
   inboundArrivals,
+  touchdownIn,
   type Aircraft,
   type ClearanceType,
   type PilotRequest,
@@ -118,6 +121,19 @@ interface Note {
   replyTo?: string;
   decision?: Message["decision"];
   timings?: Timing[];
+}
+
+/** What a step does, in words a newcomer reads at a glance. */
+function plainStep(a: { clearanceType: string; label: string }, ac: Aircraft): string {
+  switch (a.clearanceType) {
+    case PRIORITY_LANDING: return `Give it priority to land on ${ac.assignedRunway}`;
+    case ALERT_MEDICAL: return `Call paramedics to gate ${ac.gate}`;
+    case "CLEARED_TO_LAND": return `Clear it to land on ${ac.assignedRunway}`;
+    case "HOLD_POSITION": return "Stop it where it is";
+    case "RETURN_TO_LAND": return "Bring it straight back to land";
+    case "RUNWAY_CHANGE": return a.label.replace("Change to runway", "Move it to runway");
+    default: return a.label;
+  }
 }
 
 const str = (value: unknown) => (typeof value === "string" ? value : "");
@@ -256,14 +272,209 @@ export class Ops {
 
   // --------------------------------------------------------- the operator
 
+  /** "I have control": the person is told exactly what the agent withdrew, so nothing it had planned surprises them later. */
   takeover(id: string): Result {
+    const ac = this.sim.get(id.toUpperCase());
+    const withdrawn = ac ? this.agentUnsaid(ac).map((c) => this.clearanceWords(c)) : [];
     const result = this.sim.dispatch({ type: "control.takeover", aircraftId: id.toUpperCase() });
-    return result.ok ? { ok: true } : { ok: false, message: result.message };
+    if (!result.ok) return { ok: false, message: result.message };
+    const callsign = ac?.callsign ?? id.toUpperCase();
+    return { ok: true, message: `You have ${callsign}.${withdrawn.length ? ` The agent withdrew what it had not yet said: ${withdrawn.join(", ")}.` : ""}` };
   }
 
+  /** "You have control": the agent says what it picks up, the same words the person read before pressing. */
   handback(id: string): Result {
+    const ac = this.sim.get(id.toUpperCase());
+    const plan = ac ? this.onHandback(ac) : null;
     const result = this.sim.dispatch({ type: "control.handback", aircraftId: id.toUpperCase() });
-    return result.ok ? { ok: true } : { ok: false, message: result.message };
+    if (!result.ok) return { ok: false, message: result.message };
+    return { ok: true, message: `The agent has ${ac?.callsign ?? id.toUpperCase()}.${plan ? ` ${plan}` : ""}` };
+  }
+
+  /**
+   * One press for the agent's recommendation: take control if needed, then send
+   * the steps the person saw, in their name. If the picture has changed since
+   * the brief was drawn, nothing is sent and they are asked to look again.
+   */
+  accept(id: string, steps: readonly string[]): Result {
+    const ac = this.sim.get(id.toUpperCase());
+    if (!ac) return { ok: false, message: `${id} is no longer here.` };
+    const now = this.recommend(ac);
+    const same = steps.length > 0 && steps.length === now.length && steps.every((s, i) => s === now[i]!.clearanceType);
+    if (!same) return { ok: false, message: "The situation changed since this was shown. Read the new recommendation, then accept again." };
+    if (!ac.humanControl) {
+      const took = this.takeover(ac.id);
+      if (!took.ok) return took;
+    }
+    const said: string[] = [];
+    for (const step of now) {
+      const r = this.instruct(ac.id, { clearanceType: step.clearanceType, reason: `accepted the agent's recommendation: ${step.why}` });
+      if (!r.ok) return { ok: false, message: `${said.length ? `Sent: ${said.join(" ")} ` : ""}Not sent, ${step.label}: ${r.message}. You have control.` };
+      said.push(r.message ?? step.label);
+    }
+    return { ok: true, message: `You have ${ac.callsign}. Sent: ${said.join(" ")}` };
+  }
+
+  // ------------------------------------------------------------- the briefing
+
+  /** Clearances the agent decided but has not said. Taking over withdraws them. */
+  private agentUnsaid(ac: Aircraft) {
+    return [...this.sim.clearances.values()].filter((c) => c.aircraftId === ac.id && c.issuedBy !== OPERATOR && c.status === "issued");
+  }
+
+  private clearanceWords(c: { type: ClearanceType; runway?: string; gate?: string }): string {
+    const where = c.type === "TAXI" && c.gate ? `to gate ${c.gate}` : c.runway;
+    return (where ? `${LABEL[c.type]} ${where}` : LABEL[c.type]).toLowerCase();
+  }
+
+  /**
+   * What the agent would do now, at most two steps, from the actions the
+   * validator allows. Deterministic: the same picture gives the same advice.
+   */
+  private recommend(ac: Aircraft): HandoffBrief["recommend"] {
+    const h = this.flights.get(ac.id);
+    const valid = new Map(this.actions(ac.id).map((a) => [a.clearanceType, a]));
+    const steps: HandoffBrief["recommend"] = [];
+    const pick = (type: string, why: string) => {
+      const a = valid.get(type);
+      if (a && steps.length < 2 && !steps.some((s) => s.clearanceType === type)) steps.push({ ...a, label: plainStep(a, ac), why });
+    };
+    const emergency = ac.emergencyId ? this.sim.emergencies.get(ac.emergencyId) : undefined;
+    if (ac.flags.incursionActive || ac.flags.incursionHold) pick("HOLD_POSITION", "it is on or near a runway without a clearance");
+    if (ac.flags.runwayUnavailable) pick("RUNWAY_CHANGE", `runway ${ac.assignedRunway} is shut`);
+    if (emergency?.type === "engine_failure" && ac.altitudeFt > 0) pick("RETURN_TO_LAND", "engine failure: bring it straight back");
+    if (h?.escalation || ac.priority === "urgent") {
+      const why = h?.escalation ?? "urgent priority";
+      pick(PRIORITY_LANDING, `${why}: land it ahead of routine traffic`);
+      pick(ALERT_MEDICAL, `so help is waiting at gate ${ac.gate} when it arrives`);
+    }
+    if (ac.phase === "approach" && !ac.landingCleared) pick("CLEARED_TO_LAND", `runway ${ac.assignedRunway} is available`);
+    const asked = [...this.sim.requests.values()].find((r) => r.aircraftId === ac.id && r.status === "pending" && r.type !== "OTHER");
+    const answer = { PUSHBACK: "PUSHBACK", TAXI: "TAXI", TAKEOFF: "CLEARED_TAKEOFF", LANDING: "CLEARED_TO_LAND", CROSS: "CROSS_RUNWAY" } as Record<string, string>;
+    if (asked && answer[asked.type]) pick(answer[asked.type]!, "the pilot asked for it");
+    return steps;
+  }
+
+  /** A clearance as an order in plain words: "stop where it is", "abort the landing and climb away". */
+  private order(c: { type: ClearanceType; runway?: string; gate?: string }, ac: Aircraft): string {
+    const rw = c.runway ?? ac.assignedRunway;
+    switch (c.type) {
+      case "HOLD_POSITION": return "stop where it is";
+      case "GO_AROUND": return "abort the landing and climb away";
+      case "CLEARED_TO_LAND": return `land on runway ${rw}`;
+      case "CLEARED_TAKEOFF": return `take off from runway ${rw}`;
+      case "HOLD_SHORT": return `stop before runway ${rw}`;
+      case "LINE_UP_AND_WAIT": return `line up on runway ${rw} and wait`;
+      case "CROSS_RUNWAY": return `cross runway ${rw}`;
+      case "CONTINUE_APPROACH": return `keep coming in to runway ${rw}`;
+      case "TAXI": return c.gate ? `taxi to gate ${c.gate}` : `taxi to runway ${rw}`;
+      case "RETURN_TO_LAND": return "come straight back to land";
+      default: return this.clearanceWords(c);
+    }
+  }
+
+  /** Two aircraft and one runway, said the way a person would say it. */
+  private runwayConflict(ac: Aircraft, miles: number, minutes: number): { problem: string; context: string } | null {
+    const { sim } = this;
+    const c = [...sim.conflicts.values()].find(
+      (x) => x.aircraftIds.includes(ac.id) && (x.type === "runway_incursion" || x.type === "arrival_runway_occupied"),
+    );
+    const intruder = ac.flags.incursionActive || ac.flags.incursionHold;
+    if (!c && !intruder) return null;
+    const name = (id: string | undefined) => (id ? (sim.get(id)?.callsign ?? id) : "another aircraft");
+    const physical = c?.runwayId;
+    const rw = physical && physical.split("/").includes(ac.assignedRunway ?? "") ? ac.assignedRunway : (physical ?? ac.assignedRunway);
+    let other = c?.aircraftIds.find((id) => id !== ac.id);
+    if (!other && physical) other = sim.runwayState.get(physical)?.occupants.find((id) => id !== ac.id);
+    if (intruder) {
+      const o = other ? sim.get(other) : undefined;
+      const oMiles = o && o.altitudeFt > 0 ? Math.max(1, Math.round(distanceToThreshold(sim, o) / NM)) : null;
+      return {
+        problem: `On runway ${rw} without permission`,
+        context: o
+          ? oMiles !== null
+            ? `${name(other)} is coming in to land on that runway, ${oMiles} miles out.`
+            : `${name(other)} is using that runway.`
+          : "It needs to stop, then get off the runway.",
+      };
+    }
+    return {
+      problem: "Its runway is blocked",
+      context:
+        ac.phase === "go_around"
+          ? `${name(other)} is on runway ${rw}. ${ac.callsign} has aborted its landing and is climbing away.`
+          : `${name(other)} is on runway ${rw}. ${ac.callsign} is ${miles} miles out, about ${minutes} min from touchdown.`,
+    };
+  }
+
+  /** Before handing back, the person reads what the agent will and will not do. */
+  private onHandback(ac: Aircraft): string {
+    const h = this.flights.get(ac.id);
+    const first = h?.prioritised || ac.priority === "urgent" || ac.priority === "emergency";
+    let will: string;
+    if (ac.flags.runwayUnavailable) will = "The agent will move it to an open runway.";
+    else if (ac.phase === "approach" && !ac.landingCleared) will = `The agent will clear it to land on ${ac.assignedRunway}${first ? " ahead of other traffic" : ""} once the runway is free.`;
+    else if (ac.phase === "approach" || ac.phase === "landing") will = `The agent will land it on ${ac.assignedRunway} and taxi it to gate ${ac.gate}.`;
+    else if (ac.phase === "go_around" || ac.phase === "holding") will = `The agent will bring it back to land on ${ac.assignedRunway}.`;
+    else will = "The agent will handle its next request.";
+    const wont = h?.escalation && ac.flight === "arrival" && !h.medicsAlerted ? " It will not call paramedics, so call them first if needed." : "";
+    return will + wont;
+  }
+
+  private brief(ac: Aircraft, attention: FlightSummary["attention"], status: string, open: readonly PilotRequest[]): HandoffBrief | undefined {
+    if (attention !== "human_requested" && attention !== "intervene" && attention !== "human_control") return undefined;
+    const { sim } = this;
+    const h = this.flights.get(ac.id)!;
+    const held = attention === "human_control";
+    const cap = (x: string) => x[0]!.toUpperCase() + x.slice(1);
+
+    const miles = Math.max(1, Math.round(distanceToThreshold(sim, ac) / NM));
+    const minutes = Math.max(1, Math.round(touchdownIn(sim, ac) / 60));
+    const runway = this.runwayConflict(ac, miles, minutes);
+    const problem = cap(h.escalation ?? runway?.problem ?? h.record.summary.risk.reasons[0] ?? "The pilot asked for a person");
+    const context = runway
+      ? runway.context
+      : ac.phase === "approach" || ac.phase === "landing"
+        ? `Landing on runway ${ac.assignedRunway}, ${miles} miles out, about ${minutes} min from touchdown.`
+        : ac.phase === "go_around"
+          ? `Aborted its landing and is coming back around for runway ${ac.assignedRunway}.`
+          : ac.phase === "holding"
+            ? `Circling in a hold, waiting to land on runway ${ac.assignedRunway}.`
+            : `${cap(status)}.`;
+
+    let deadline: HandoffBrief["deadline"] = null;
+    if (ac.phase === "approach" && !ac.landingCleared) {
+      const inS = Math.round(touchdownIn(sim, ac) - flyingSec(sim.config.rules.decisionDistanceNm * NM));
+      if (Number.isFinite(inS) && inS > 0) deadline = { inS, then: "it has to abort the landing" };
+    }
+
+    // What is true right now, so nobody has to work it out from the radio log.
+    const now: string[] = [held ? `You are in control. The agent will not talk to ${ac.callsign}.` : `The agent is still handling ${ac.callsign} until you take over.`];
+    if (h.prioritised) now.push(`It has priority to land on runway ${ac.assignedRunway}.`);
+    if (h.medicsAlerted) now.push(`Paramedics are on their way to gate ${ac.gate}.`);
+    if (ac.phase === "approach" && !ac.landingCleared) now.push("It is not cleared to land yet.");
+    let agentDoing: HandoffBrief["agentDoing"] = null;
+    const latest = ac.clearance ? sim.clearances.get(ac.clearance.id) : undefined;
+    if (latest) {
+      const order = this.order(latest, ac);
+      const who = latest.issuedBy === OPERATOR ? "You" : "The agent";
+      const recent = sim.time - (latest.acknowledgedAt ?? -Infinity) < 60;
+      if (latest.status === "transmitted") now.push(`${who} told ${ac.callsign} to ${order}. Waiting for the pilot to confirm.`);
+      else if (latest.status === "readback_missing") now.push(`The pilot did not confirm the order to ${order}.`);
+      else if (latest.status === "acknowledged" && recent && latest.issuedBy !== OPERATOR) now.push(`${ac.callsign} confirmed it will ${order}.`);
+      if (!held && latest.issuedBy !== OPERATOR && latest.status === "transmitted") agentDoing = { text: `telling ${ac.callsign} to ${order}`, cancelledByTakeover: false };
+    }
+    if (!held) {
+      for (const c of this.agentUnsaid(ac)) {
+        now.push(`The agent is about to tell ${ac.callsign} to ${this.order(c, ac)}.`);
+        agentDoing = { text: `telling ${ac.callsign} to ${this.order(c, ac)}`, cancelledByTakeover: true };
+      }
+    }
+    for (const r of open) {
+      if (r.type !== "OTHER" && r.heardAt !== undefined && sim.time - r.heardAt >= 60) now.push(`The pilot has waited ${Math.floor((sim.time - r.heardAt) / 60)} min for ${r.type.toLowerCase()}.`);
+    }
+
+    return { problem, context, deadline, recommend: this.recommend(ac), now, agentDoing, onHandback: held ? this.onHandback(ac) : null };
   }
 
   instruct(id: string, body: Partial<OperatorInstruction>): Result {
@@ -300,6 +511,8 @@ export class Ops {
     const h = this.flights.get(ac.id)!;
     if (landing) h.prioritised = true;
     else h.medicsAlerted = true;
+    // The brief must stop recommending what was just done.
+    this.refresh(false);
     return { ok: true, message: text };
   }
 
@@ -403,6 +616,9 @@ export class Ops {
         attention,
         need,
       };
+      const brief = this.brief(ac, attention, status, open.get(ac.id) ?? []);
+      if (brief) record.summary.brief = brief;
+      else delete record.summary.brief;
       this.pushSeries(h, t);
     }
   }
@@ -719,6 +935,7 @@ export class Ops {
       risk: normalRisk(),
       attention: "none",
       need: null,
+      brief: undefined,
     };
     this.pushSeries(h, t);
   }

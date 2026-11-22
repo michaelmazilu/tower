@@ -26,6 +26,8 @@ export interface FlightDetailProps {
   action?: ReactNode;
   /** A band under that, for example the operator's controls. */
   controls?: ReactNode;
+  /** When a person is needed: replaces the status band and the numbers with what to do. */
+  briefing?: ReactNode;
 }
 
 /** CLEAR_TO_LAND reads "clear to land". */
@@ -43,7 +45,7 @@ const safeAudio = (url?: string) => (url?.startsWith("/") && !url.startsWith("//
 
 export function FlightDetail({
   record, t, endT, live, playing, onSeek, onPlay, onLive, onClose,
-  closeLabel = "all flights", formatTime = clock, nameOf = (id) => id, action, controls,
+  closeLabel = "all flights", formatTime = clock, nameOf = (id) => id, action, controls, briefing,
 }: FlightDetailProps) {
   const now = flightAt(record, t);
   // While live the server's summary is newer than the last recorded step.
@@ -72,7 +74,7 @@ export function FlightDetail({
         </div>
       </header>
 
-      <section className="fd-need">
+      {briefing ?? <section className="fd-need">
         <div>
           <small>{live ? "" : "then / "}{ATTENTION_WORDS[flight.attention]}</small>
           <strong>{flight.need ?? (held ? "The agent will not act on this flight." : "Nothing needed right now")}</strong>
@@ -82,7 +84,7 @@ export function FlightDetail({
           </p>
         </div>
         {action}
-      </section>
+      </section>}
       {responders && (
         <p className="fd-responders">
           <i /><i /><i />
@@ -92,7 +94,7 @@ export function FlightDetail({
       )}
       {controls}
 
-      <dl className="fd-stats">
+      {!briefing && <dl className="fd-stats">
         <Stat label="altitude" value={altitude(flight.altFt)} note={Math.abs(flight.vsFpm) >= 100 ? `${flight.vsFpm > 0 ? "up" : "down"} ${Math.abs(Math.round(flight.vsFpm / 50) * 50)} fpm` : "level"} />
         <Stat label="speed" value={`${Math.round(flight.gsKt)} kt`} note={`heading ${String(Math.round(flight.hdg) % 360).padStart(3, "0")}`} />
         <Stat
@@ -105,9 +107,9 @@ export function FlightDetail({
         />
         <Response label="controller response" message={lastReply("controller")} all={record.messages} />
         <Response label="pilot response" message={lastReply("pilot")} all={record.messages} />
-      </dl>
+      </dl>}
 
-      <Conversation record={record} t={t} onSeek={onSeek} formatTime={formatTime} />
+      {!briefing && <Conversation record={record} t={t} onSeek={onSeek} formatTime={formatTime} />}
       <Scrubber {...{ record, t, endT, live, playing, onSeek, onPlay, onLive, formatTime }} />
     </article>
   );
