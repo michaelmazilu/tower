@@ -240,3 +240,5 @@ export interface OperatorInstruction {
  *   GET  /api/audio/:file                     cached audio
  *   WS   /ws                                  existing messages, plus { type: "ops", ops: OpsState } at 2 Hz
  */
+
+export * from "./cockpit";

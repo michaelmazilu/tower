@@ -15,9 +15,10 @@ import {
   urgency,
   type WorldIndex,
 } from "./data";
-import { isBlocked } from "../shared/replay";
-import { Speaker } from "../shared/sound";
+import { useSound } from "../shared/sound";
 import { useSteadyOrder } from "../shared/useSteadyOrder";
+import { Conversation, lineAt, openingLine, type OnAirNow } from "./conversation";
+import { VoiceBar } from "./VoiceBar";
 import { FlightPanel } from "./FlightPanel";
 import { Profiles } from "./Profiles";
 import { Track } from "./Track";
@@ -25,12 +26,16 @@ import { useClock, type Clock } from "./useClock";
 import { WorldMap } from "./WorldMap";
 
 const SPEEDS = [1, 5, 15, 60];
-const REVIEW_SPEED = 5;
-/** Same origin only, and never a line the validator stopped. */
-const voiceUrl = (m: Message) => (!isBlocked(m) && /^\/(?!\/)/.test(m.audioUrl ?? "") ? m.audioUrl : undefined);
+const STEP_MS = 300;
+const SCRUB_MS = 400;
+/** A moment picked just after a call began still opens on that call. */
+const LEAD_S = 1;
 const RED_EVENTS: Marker["kind"][] = ["conflict", "emergency", "escalation"];
 
-export default function WorldView({ sound }: { sound: boolean }) {
+export default function WorldView({ sound, onSound }: { sound: boolean; onSound?: () => void }) {
+  // Without the app's switch, this screen keeps one of its own.
+  const own = useSound();
+  const audible = onSound ? sound : own.on && own.ready;
   const [index, setIndex] = useState<WorldIndex | null>(null);
   const [failed, setFailed] = useState("");
 
@@ -56,7 +61,7 @@ export default function WorldView({ sound }: { sound: boolean }) {
     };
   }, []);
 
-  if (index) return <World index={index} sound={sound} />;
+  if (index) return <World index={index} sound={audible} onSound={onSound ?? own.press} />;
   return (
     <div className="wv wv-wait" role="status">
       <b>{failed ? "waiting for the world recording" : "loading the world"}</b>
@@ -72,14 +77,15 @@ function openingT({ incidents, world }: WorldIndex) {
   return Math.max(0, first ? first.t - 90 : early);
 }
 
-function World({ index, sound }: { index: WorldIndex; sound: boolean }) {
+function World({ index, sound, onSound }: { index: WorldIndex; sound: boolean; onSound(): void }) {
   const { world, flights, byId } = index;
   const start = useMemo(() => openingT(index), [index]);
   const clock = useClock(world.durationS, start);
   const t = clock.now();
   const epochMs = useMemo(() => Date.parse(world.epoch) || 0, [world]);
   const [selected, setSelected] = useState<string | null>(null);
-  const voice = useRef(new Speaker());
+  const [onAir, setOnAir] = useState<OnAirNow | null>(null);
+  const talk = useMemo(() => new Conversation(clock, setOnAir), [clock]);
   const speedBefore = useRef(clock.speed);
 
   const order = flights
@@ -90,79 +96,58 @@ function World({ index, sound }: { index: WorldIndex; sound: boolean }) {
     })
     .sort((a, b) => a.when - b.when || b.rank - a.rank || a.f.summary.callsign.localeCompare(b.f.summary.callsign));
 
-  const stopVoice = useCallback(() => voice.current.stop(), []);
-
-  const playVoice = useCallback(
-    (m: Message) => {
-      stopVoice();
-      if (isBlocked(m)) return;
-      const url = voiceUrl(m);
-      if (!url && !sound) return;
-      clock.setSpeed(1);
-      clock.setPlaying(true);
-      voice.current.say({ text: m.text, url, pilot: m.from === "pilot" || m.speaker.endsWith("(simulated)") ? m.speaker : undefined });
-    },
-    [clock, stopVoice, sound],
-  );
-  useEffect(() => stopVoice, [stopVoice]);
+  useEffect(() => talk.setSound(sound), [talk, sound]);
+  useEffect(() => talk.setPaused(!clock.playing), [talk, clock.playing]);
+  useEffect(() => () => talk.stop(), [talk]);
 
   const select = useCallback(
-    (id: string | null, seekT?: number) => {
-      stopVoice();
-      if (id && !selected) {
-        speedBefore.current = clock.speed;
-        // Voiced flights open in real time, so their lines can be heard.
-        const voiced = byId.get(id)?.messages.some(voiceUrl);
-        clock.setSpeed(Math.min(clock.speed, voiced ? 1 : REVIEW_SPEED));
-      } else if (!id && selected) clock.setSpeed(speedBefore.current);
-      setSelected(id);
+    (id: string | null, seekT?: number, delayMs = 0) => {
       const f = id ? byId.get(id) : undefined;
-      const spoken = f?.messages.find(voiceUrl);
-      if (seekT !== undefined) clock.seek(seekT);
-      // A flight with recorded voice opens on it. The scrubber reaches every other moment.
-      else if (spoken) clock.seek(Math.max(0, spoken.t - 1));
-      else if (f && !activeAt(f, clock.now())) {
-        // A flight that is not live opens at its first notable moment.
-        const key = f.markers.find((m) => m.kind !== "handoff")?.t ?? f.messages[0]?.t ?? f.startT;
-        clock.seek(key);
-      } else clock.seek(clock.now());
+      setSelected(f ? id : null);
+      if (!f) {
+        talk.stop();
+        if (selected) clock.setSpeed(speedBefore.current);
+        return;
+      }
+      if (!selected) speedBefore.current = clock.speed;
+      const m = seekT === undefined ? openingLine(f, clock.now()) : lineAt(f, seekT - LEAD_S);
+      clock.seek(seekT ?? m?.t ?? f.startT);
+      clock.setSpeed(1);
+      clock.setPlaying(true);
+      talk.setPaused(false);
+      talk.play(f, m, delayMs);
     },
-    [byId, clock, selected, stopVoice],
-  );
-
-  const seek = useCallback(
-    (to: number) => {
-      stopVoice();
-      clock.seek(to);
-    },
-    [clock, stopVoice],
+    [byId, clock, selected, talk],
   );
 
   const flight = selected ? byId.get(selected) : undefined;
 
-  // Lines are heard as playback crosses them in real time: the recording, else a voice on this computer.
-  const line = flight ? upTo(flight.messages, t, (m) => m.t) : -1;
-  const spoke = useRef<string | null>(null);
-  useEffect(() => {
-    const m = flight?.messages[line];
-    if (!m) {
-      spoke.current = null;
-      return;
-    }
-    if (isBlocked(m) || !clock.playing || clock.speed !== 1 || t - m.t >= 1) {
-      spoke.current = null;
-      return;
-    }
-    const url = voiceUrl(m);
-    if ((!url && !sound) || spoke.current === m.id) return;
-    spoke.current = m.id;
-    // A touch quick, so that a long line ends before the answer to it starts.
-    voice.current.say({ text: m.text, url, pilot: m.from === "pilot" || m.speaker.endsWith("(simulated)") ? m.speaker : undefined }, 1.1);
-  }, [line, flight]);
+  const seek = useCallback(
+    (to: number) => {
+      clock.seek(to);
+      if (!flight) return;
+      clock.setSpeed(1);
+      talk.play(flight, lineAt(flight, to), SCRUB_MS);
+    },
+    [clock, flight, talk],
+  );
 
-  useEffect(() => {
-    if (!clock.playing || clock.speed !== 1) stopVoice();
-  }, [clock.playing, clock.speed, stopVoice]);
+  const playVoice = useCallback(
+    (m: Message) => {
+      if (!flight) return;
+      clock.setPlaying(true);
+      talk.setPaused(false);
+      talk.play(flight, m);
+    },
+    [clock, flight, talk],
+  );
+
+  // Faster than speech is watched, not heard.
+  const setSpeed = (speed: number) => {
+    if (flight && speed === 1) talk.play(flight, lineAt(flight, clock.now()));
+    else talk.stop();
+    clock.setSpeed(speed);
+  };
 
   // Unattended, the world keeps running.
   useEffect(() => {
@@ -187,14 +172,30 @@ function World({ index, sound }: { index: WorldIndex; sound: boolean }) {
 
   // Recording order, because urgency order moves under the playhead.
   const place = flights.findIndex((f) => f.summary.id === selected);
-  const step = (by: number) => select(flights[(place + by + flights.length) % flights.length]!.summary.id);
+  const step = (by: number) => select(flights[(place + by + flights.length) % flights.length]!.summary.id, undefined, STEP_MS);
 
   return (
     <div className={`wv ${flight ? "open" : ""}`}>
       <Stats index={index} t={t} />
       <main className="wv-body">
         <div className="wv-stage">
-          <WorldMap index={index} clock={clock} selected={selected} onSelect={select} />
+          <WorldMap
+            index={index}
+            clock={clock}
+            selected={selected}
+            speaking={clock.playing && onAir?.phase === "speaking" ? onAir.message.from : null}
+            onSelect={select}
+          />
+          {flight ? (
+            <VoiceBar now={onAir} sound={sound} playing={clock.playing} onSound={onSound} />
+          ) : (
+            !sound && (
+              <button className="wv-hear over" onClick={onSound}>
+                <b>sound is off</b>
+                press, then click any plane to hear it
+              </button>
+            )
+          )}
           {flight ? (
             <Profiles f={flight} index={index} t={t} onSeek={seek} />
           ) : (
@@ -213,12 +214,13 @@ function World({ index, sound }: { index: WorldIndex; sound: boolean }) {
             onClose={() => select(null)}
             onStep={step}
             onPlay={playVoice}
+            speakingId={onAir && onAir.phase !== "ended" ? onAir.message.id : undefined}
           />
         ) : (
           <Roster order={order} epochMs={epochMs} onSelect={select} />
         )}
       </main>
-      <Transport index={index} clock={clock} t={t} epochMs={epochMs} selected={selected} onSeek={seek} onSelect={select} />
+      <Transport index={index} clock={clock} t={t} epochMs={epochMs} selected={selected} onSeek={seek} onSpeed={setSpeed} onSelect={select} />
     </div>
   );
 }
@@ -247,7 +249,7 @@ function Stats({ index, t }: { index: WorldIndex; t: number }) {
   );
 }
 
-function OnAir({ index, t, onSelect }: { index: WorldIndex; t: number; onSelect(id: string): void }) {
+function OnAir({ index, t, onSelect }: { index: WorldIndex; t: number; onSelect(id: string, seekT: number): void }) {
   const i = upTo(index.onAir, t, (e) => e.m.t);
   const recent = index.onAir.slice(Math.max(0, i - 2), i + 1);
   return (
@@ -256,7 +258,7 @@ function OnAir({ index, t, onSelect }: { index: WorldIndex; t: number; onSelect(
       <ol>
         {recent.map(({ flightId, m }, n) => (
           <li key={m.id} className={n === recent.length - 1 ? "now" : ""}>
-            <button onClick={() => onSelect(flightId)}>
+            <button onClick={() => onSelect(flightId, m.t)}>
               <em>
                 <i className={`voice ${m.from}`} />
                 {m.speaker}
@@ -363,6 +365,7 @@ function Transport({
   epochMs,
   selected,
   onSeek,
+  onSpeed,
   onSelect,
 }: {
   index: WorldIndex;
@@ -371,6 +374,7 @@ function Transport({
   epochMs: number;
   selected: string | null;
   onSeek(t: number): void;
+  onSpeed(speed: number): void;
   onSelect(id: string, seekT: number): void;
 }) {
   const { world, incidents, onAir, byId } = index;
@@ -449,7 +453,7 @@ function Transport({
             key={s}
             className={`wv-key ${clock.speed === s ? "dark" : ""}`}
             aria-pressed={clock.speed === s}
-            onClick={() => clock.setSpeed(s)}
+            onClick={() => onSpeed(s)}
           >
             {s}×
           </button>

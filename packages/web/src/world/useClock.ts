@@ -11,9 +11,10 @@ export function useClock(duration: number, start: number) {
     let since = performance.now();
     let playing = true;
     let speed = 15;
+    let until: number | null = null;
     const now = () => {
       const t = playing ? base + ((performance.now() - since) / 1000) * speed : base;
-      return Math.min(duration, Math.max(0, t));
+      return Math.min(until ?? duration, duration, Math.max(0, t));
     };
     const rebase = (t = now()) => {
       base = Math.min(duration, Math.max(0, t));
@@ -29,7 +30,15 @@ export function useClock(duration: number, start: number) {
       get speed() {
         return speed;
       },
-      seek: (t: number) => rebase(t),
+      seek(t: number) {
+        until = null;
+        rebase(t);
+      },
+      /** The clock runs up to here and waits, as it does for a line being spoken. */
+      hold(to: number | null) {
+        rebase();
+        until = to;
+      },
       setPlaying(next: boolean) {
         rebase(next && now() >= duration ? 0 : undefined);
         playing = next;

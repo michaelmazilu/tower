@@ -381,3 +381,19 @@
 .wv-talk li.blocked .text { text-decoration: line-through; }
 .wv-stage :focus-visible, .wv .row.red:focus-visible, .wv .play:focus-visible { outline-color: var(--white); }
 .wv-transport .caption b { font-family: var(--mono); }
+
+/* ---------------------------------------------------------------- voice */
+.wv-onair { flex: none; height: 86px; display: flex; background: var(--black); color: var(--white); overflow: hidden; }
+.wv-onair .said { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 var(--pad); color: var(--grey-400); }
+.wv-onair.live .said { color: var(--white); }
+.wv-onair em { display: flex; align-items: center; gap: var(--unit); font: 700 12px var(--mono); white-space: nowrap; }
+.wv-onair p { font-size: 15px; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.wv-onair .source { flex: none; width: 174px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 var(--pad); border-left: 1px solid var(--grey-800); }
+.wv-onair .source > b { font-size: 15px; }
+.wv-onair small { font-family: var(--mono); color: var(--grey-400); }
+.wv-onair small span { display: block; }
+.wv .wv-onair .source:has(.wv-hear) { padding: 0; }
+.wv .wv-hear { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 var(--pad); background: var(--red); color: var(--white); text-align: center; }
+.wv-hear b { font-size: 16px; }
+.wv-stage { position: relative; }
+.wv .wv-hear.over { position: absolute; z-index: 3; top: 12px; left: 12px; height: 56px; padding: 0 20px; }

@@ -10,7 +10,7 @@ TowerAI watches every aircraft in a live simulation of Toronto Pearson to spot d
 
 **No controller should ever have to carry the sky alone. With TowerAI, they won't.**
 
-*This is a simulation, not a system for real traffic. The live demo runs a rules controller so it is reliable; the ElevenLabs agents are optional, and their recorded decisions are labelled `llm`. [What is real and what is modelled](docs/DEMO.md#real-and-modelled).*
+*This is a simulation, not a system for real traffic. Anyone can sit in the pilot's seat and talk to the tower: ElevenLabs hears and speaks, rules and an agent understand, and the validator decides. Pearson operations run a rules controller so they are reliable, and every model decision is labelled `llm`. [What is real and what is modelled](docs/DEMO.md#real-and-modelled).*
 
 ## Run it
 
@@ -27,13 +27,14 @@ Open http://127.0.0.1:8787. No key, no network, no credits. The click-by-click s
 | Command | |
 |---|---|
 | `npm run judge` | Build and serve the demo: rules controller, cached voice |
+| `npm run judge:talk` | The full demo: talk to the tower from the cockpit and hear any world flight. Reads `.env` and spends ElevenLabs credits |
 | `npm run judge:live` | The one switch for live LLM tower and pilots. Reads `.env` and spends ElevenLabs credits |
 | `npm run record:world` | Rebuild the world recording offline from recorded LLM choices and audio |
 | `npm run dev` | Server with reload; the UI dev server is `npm run dev -w @towerai/web` |
 | `npm run demo` | The guided scenario headless |
 | `npm test`, `npm run typecheck` | Checks |
 
-Only `judge:live` loads `.env`. Other settings are environment variables, listed in [.env.example](.env.example).
+Only `judge:talk` and `judge:live` load `.env`. Other settings are environment variables, listed in [.env.example](.env.example).
 
 ## The airport
 
@@ -128,7 +129,7 @@ The tower, controller and pilot agents and their tools are created by an idempot
 node --env-file=.env --import tsx packages/server/src/agents/setup.ts
 ```
 
-Agents never write safety-critical words: they call validated tools or pick from validated options, and any failure falls back to rules. Spending is capped in code at 5,000 credits (`TOWERAI_CREDIT_CAP` can lower it). How latency was measured, with its flaws, is in [docs/latency-results.md](docs/latency-results.md).
+Agents never write safety-critical words: they call validated tools or pick from validated options, and any failure falls back to rules. Spending is capped in code at 9,500 credits (`TOWERAI_CREDIT_CAP` can lower it). How latency was measured, with its flaws, is in [docs/latency-results.md](docs/latency-results.md).
 
 ## Replay
 

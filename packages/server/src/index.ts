@@ -18,6 +18,9 @@ import {
 import { MAX_SPEED, MIN_SPEED, SimHost, isControllerMode } from "./host";
 
 import { towerFromEnv } from "./atc/elevenLabs";
+import { ElevenLabs } from "./agents/client";
+import { createCockpit, handleCockpit } from "./cockpit";
+import { worldVoice } from "./voice/worldVoice";
 import { agentConfig } from "./atc/config";
 import { isJsonObject, parseClientJson } from "./json";
 import { appFile, isFile, serveFile } from "./files";
@@ -71,6 +74,11 @@ const host = new SimHost({
   speed: Number(env.TOWERAI_SPEED ?? 1) || 1,
   plugins,
 });
+
+// Live speech exists only if it was asked for at startup, like paid control.
+const talkApi = env.TOWERAI_TALK === "on" ? ElevenLabs.fromEnv() : null;
+const cockpit = createCockpit({ api: talkApi });
+let stopMeter: (() => void) | undefined;
 
 // ------------------------------------------------------------------- http
 
@@ -267,8 +275,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     }
   }
 
+  if (path === "/api/cockpit" || path.startsWith("/api/cockpit/")) {
+    if (method === "POST") authorize(req);
+    if (await handleCockpit(cockpit, req, res, path)) return;
+  }
+
   if (method === "POST") {
     authorize(req);
+    if (path === "/api/world/voice") return send(res, 200, await worldVoice(await readJson(req), talkApi));
     if (path.startsWith("/api/tools/")) {
       const name = decoded(path.slice("/api/tools/".length));
       const body = await readJson(req);
@@ -428,10 +442,15 @@ server.listen(PORT, HOST, () => {
   console.log(`  radio:      controller=${s.radio.controller} pilots=${s.radio.pilots}`);
   console.log(`  secret:     ${SECRET ? "required for POST" : "none (set TOWERAI_SECRET before exposing this beyond localhost)"}`);
   host.start();
+  cockpit.start();
+  stopMeter = talkApi?.watchMeter();
+  console.log(`  cockpit:    ${talkApi ? "live ElevenLabs speech (spends credits)" : "typed input, rules, no spend (npm run judge:talk for speech)"}`);
 });
 
 function shutdown(): void {
   host.stop();
+  cockpit.stop();
+  stopMeter?.();
   wss.close();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 500).unref();

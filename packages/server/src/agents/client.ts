@@ -1,8 +1,8 @@
 import { dataPath, readData, writeData } from "./data";
 
 const API = "https://api.elevenlabs.io";
-/** Account credits. The owner's hard limit is 5000 for the night; agents and voice stop earlier. */
-export const HARD_CAP = 5000;
+/** Account credits. The owner's hard limit; the free plan holds 10000 and cannot go over. */
+export const HARD_CAP = 9500;
 const DEFAULT_CAP = 3500;
 /** The free tier allows four concurrent requests. One is left spare. */
 const MAX_IN_FLIGHT = 3;
@@ -114,6 +114,27 @@ export class ElevenLabs {
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
     });
+  }
+
+  /** Multipart, so fetch writes the content type itself. */
+  upload(path: string, form: FormData, signal: AbortSignal): Promise<Response> {
+    return this.request(API + path, { method: "POST", headers: { "xi-api-key": this.key }, body: form, signal });
+  }
+
+  /** Keeps the meter warm, so that no live answer waits for it to be read. */
+  watchMeter(): () => void {
+    let timer: NodeJS.Timeout;
+    let stopped = false;
+    const poll = async () => {
+      this.batch = this.guard.refresh();
+      const ok = await this.batch.then(() => true, () => false);
+      if (!stopped) timer = setTimeout(() => void poll(), ok ? 40_000 : 3_000);
+    };
+    void poll();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
   }
 
   async json<T>(method: string, path: string, body: unknown, signal: AbortSignal): Promise<T> {

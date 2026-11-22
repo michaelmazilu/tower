@@ -6,7 +6,7 @@ import { agentConfig } from "../atc/config";
 import { TOOL_PREFIX } from "../atc/elevenLabs";
 import { TTS_MODEL } from "../voice/voice";
 import { ElevenLabs } from "./client";
-import { agentIds, dataPath, writeData, type AgentIds } from "./data";
+import { agentIds, dataPath, readData, writeData, type AgentIds } from "./data";
 
 const LLM = process.env.TOWERAI_LLM ?? agentIds()?.llm ?? "gpt-6-luna";
 const REASONING: Record<string, string | undefined> = {
@@ -95,5 +95,5 @@ const ids: AgentIds = {
   controller: await upsert("TowerAI Controller", CONTROLLER_PROMPT, 120),
   pilot: await upsert("TowerAI Pilot", PILOT_PROMPT, 120),
 };
-writeData(dataPath("agents.json"), { ...ids, tts: TTS_MODEL, toolIds, updatedAt: new Date().toISOString() });
+writeData(dataPath("agents.json"), { ...readData<Record<string, unknown>>(dataPath("agents.json"), {}), ...ids, tts: TTS_MODEL, toolIds, updatedAt: new Date().toISOString() });
 console.log(ids, await api.guard.refresh());

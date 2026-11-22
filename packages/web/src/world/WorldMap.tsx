@@ -1,4 +1,4 @@
-import type { ControlPosition } from "@towerai/contracts";
+import type { ControlPosition, Message } from "@towerai/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { activeAt, liveConflicts, needsPerson, nearestAt, poseAt, stateAt, urgency, type WorldIndex } from "./data";
 import {
@@ -19,7 +19,11 @@ import type { Clock } from "./useClock";
 
 /** Map units across the frame when following a flight. */
 const SPAN: Record<ControlPosition, number> = { ground: 6, tower: 6, departure: 10, approach: 10, enroute: 44 };
-const HIT_PX = 24;
+const HIT_PX = 44;
+/** On a cluster's label, only a press right on an aircraft is for that aircraft. */
+const ON_PLANE_PX = 8;
+/** A press on a background dot opens the controlled flight nearest to it. */
+const DOT_PX = 10;
 /** At world zoom, flights this close become one count. */
 const CLUSTER_PX = 42;
 const CLUSTER_BELOW = 2.2;
@@ -39,6 +43,7 @@ interface Props {
   index: WorldIndex;
   clock: Clock;
   selected: string | null;
+  speaking: Message["from"] | null;
   onSelect(id: string): void;
 }
 
@@ -51,12 +56,12 @@ interface Box {
 
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-export function WorldMap({ index, clock, selected, onSelect }: Props) {
+export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [land, setLand] = useState<Land | null>(null);
   const [free, setFree] = useState(false);
-  const live = useRef({ clock, selected, free, onSelect });
-  live.current = { clock, selected, free, onSelect };
+  const live = useRef({ clock, selected, speaking, free, onSelect });
+  live.current = { clock, selected, speaking, free, onSelect };
 
   useEffect(() => {
     let mounted = true;
@@ -132,6 +137,7 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
     let hover: string | null = null;
     let hits: { id: string; x: number; y: number; rank: number }[] = [];
     let hubs: (Box & { at: XY })[] = [];
+    let dots: XY[] = [];
 
     const resize = new ResizeObserver(([entry]) => {
       w = entry!.contentRect.width;
@@ -221,7 +227,7 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
       const dt = now - last;
       last = now;
       if (!w || !h || !land) return;
-      const { clock, selected, free } = live.current;
+      const { clock, selected, speaking, free } = live.current;
       const t = clock.now();
       const conflicts = liveConflicts(index, t);
       const sel = selected ? index.byId.get(selected) : undefined;
@@ -259,12 +265,14 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
       g.strokeStyle = c.g600;
       g.lineWidth = 1;
       const tails = new Path2D();
+      dots = [];
       for (const f of shapes.background) {
         const k = (t - f.departT) / f.durationS;
         if (k < 0 || k > 1) continue;
         const [x, y] = toScreen(view, f.at(k));
         if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
         g.fillRect(x - 1, y - 1, 2, 2);
+        dots.push([x, y]);
         const [px, py] = toScreen(view, f.at(Math.max(0, k - 0.025)));
         if (Math.abs(px - x) > w / 2) continue;
         tails.moveTo(px, py);
@@ -367,7 +375,7 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
       const badges = groups
         .filter((group) => group.length > 2)
         .map((group) => {
-          for (const p of group) if (!p.red) folded.add(p.id);
+          for (const p of group) if (!p.red && p.id !== hover) folded.add(p.id);
           const mean = (of: (p: (typeof group)[number]) => number) => group.reduce((sum, p) => sum + of(p), 0) / group.length;
           const calls = group.filter((p) => activeAt(p.f, t) && needsPerson(p.state)).length;
           return { group, x: mean((p) => p.x), y: mean((p) => p.y), calls, conflict: !calls && group.some((p) => p.red) };
@@ -407,7 +415,21 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
         g.restore();
       }
 
-      hits = planes.filter((p) => !folded.has(p.id)).map((p) => ({ id: p.id, x: p.x, y: p.y, rank: p.rank }));
+      if (chosen && speaking) {
+        // Out from the aircraft while the pilot talks, in towards it while the tower does.
+        g.strokeStyle = chosen.red ? c.red : c.white;
+        g.lineWidth = 2;
+        for (const offset of [0, 0.5]) {
+          const k = (now / 1100 + offset) % 1;
+          const r = 20 + (speaking === "pilot" ? k : 1 - k) * 30;
+          g.globalAlpha = 1 - (r - 20) / 36;
+          g.strokeRect(chosen.x - r, chosen.y - r, r * 2, r * 2);
+        }
+        g.globalAlpha = 1;
+      }
+
+      // Folded ones too: a press in a pile is for the aircraft nearest to it.
+      hits = planes.filter((p) => p.x >= -HIT_PX && p.y >= -HIT_PX && p.x <= w + HIT_PX && p.y <= h + HIT_PX).map((p) => ({ id: p.id, x: p.x, y: p.y, rank: p.rank }));
 
       // Most urgent first; a label that finds no room is left out.
       const boxes: Box[] = [];
@@ -509,14 +531,21 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
     }
     frame = requestAnimationFrame(draw);
 
-    const nearest = (x: number, y: number) =>
+    const closestTo = (x: number, y: number, within: number) =>
       hits
         .map((p) => ({ ...p, d: Math.hypot(p.x - x, p.y - y) }))
-        .filter((p) => p.d < HIT_PX)
-        // Within a cluster the pixel nearest wins, urgency breaks ties.
-        .sort((a, z) => Math.round(a.d / 5) - Math.round(z.d / 5) || z.rank - a.rank)[0]?.id ?? null;
+        .filter((p) => p.d < within)
+        // The pixel nearest wins, urgency breaks ties.
+        .sort((a, z) => Math.round(a.d / 2) - Math.round(z.d / 2) || z.rank - a.rank)[0]?.id ?? null;
 
     const hubAt = (x: number, y: number) => hubs.find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+    /** What a press here opens: an aircraft, else null. */
+    const target = (x: number, y: number) => {
+      if (hubAt(x, y)) return closestTo(x, y, ON_PLANE_PX);
+      const id = closestTo(x, y, HIT_PX);
+      if (id) return id;
+      return dots.some(([dx, dy]) => Math.hypot(dx - x, dy - y) < DOT_PX) ? closestTo(x, y, Infinity) : null;
+    };
     let press: { x: number; y: number; moved: boolean; from: Camera } | null = null;
     const local = (e: MouseEvent): XY => {
       const r = el.getBoundingClientRect();
@@ -540,31 +569,21 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
         cam = wanted;
         return;
       }
-      hover = nearest(x, y);
+      hover = target(x, y);
       el.style.cursor = hover || hubAt(x, y) ? "pointer" : "grab";
     };
     const up = (e: PointerEvent) => {
       if (press && !press.moved && cam) {
         const [x, y] = local(e);
-        const id = nearest(x, y);
+        const id = target(x, y);
         const pressed = hubAt(x, y);
-        if (pressed) {
+        if (id) live.current.onSelect(id);
+        else if (pressed) {
           live.current.free = true;
           setFree(true);
           toHub.current = false;
           wanted = bound({ k: overview(w, h).k * 9, x: cam.x + (pressed.at[0] - w / 2) / cam.k, y: cam.y + (pressed.at[1] - h / 2) / cam.k }, w, h);
-          press = null;
-          return;
         }
-        const hit = hits.find((p) => p.id === id);
-        const pile = hit ? hits.filter((p) => Math.hypot(p.x - hit.x, p.y - hit.y) < 9).length : 0;
-        const out = overview(w, h);
-        if (hit && pile > 2 && cam.k < out.k * 2) {
-          // Too tight to tell apart from out here, so open the hub first.
-          live.current.free = true;
-          setFree(true);
-          wanted = bound({ k: out.k * 10, x: cam.x + (hit.x - w / 2) / cam.k, y: cam.y + (hit.y - h / 2) / cam.k }, w, h);
-        } else if (id) live.current.onSelect(id);
       }
       press = null;
     };

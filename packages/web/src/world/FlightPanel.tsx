@@ -34,9 +34,11 @@ interface Props {
   onClose(): void;
   onStep(by: number): void;
   onPlay(m: Message): void;
+  /** The line the voice is on. */
+  speakingId?: string;
 }
 
-export function FlightPanel({ f, index, epochMs, t, onSeek, position, onClose, onStep, onPlay }: Props) {
+export function FlightPanel({ f, index, epochMs, t, onSeek, position, onClose, onStep, onPlay, speakingId }: Props) {
   const s = f.summary;
   const at = Math.min(f.endT, Math.max(f.startT, t));
   const pose = poseAt(f, at);
@@ -147,7 +149,7 @@ export function FlightPanel({ f, index, epochMs, t, onSeek, position, onClose, o
       )}
 
       <div className="wv-detail">
-        <Conversation f={f} epochMs={epochMs} t={t} now={now} onSeek={onSeek} onPlay={onPlay} />
+        <Conversation f={f} epochMs={epochMs} t={t} now={now} onSeek={onSeek} onPlay={onPlay} speakingId={speakingId} />
         <div className="wv-why">
           <Decision f={f} now={now} t={at} score={state.risk.score} reasons={state.risk.reasons} />
           <Latency f={f} now={now} />
@@ -164,6 +166,7 @@ function Conversation({
   now,
   onSeek,
   onPlay,
+  speakingId,
 }: {
   f: FlightRecord;
   epochMs: number;
@@ -171,6 +174,7 @@ function Conversation({
   now: number;
   onSeek(t: number): void;
   onPlay(m: Message): void;
+  speakingId?: string;
 }) {
   const list = useRef<HTMLOListElement>(null);
   // Radio and events are one story, in the order it happened.
@@ -215,7 +219,7 @@ function Conversation({
           const blocked = isBlocked(m);
           const refusal = isRefusal(m);
           return (
-            <li key={m.id} className={`${i === now ? "now" : i > now ? "later" : ""} ${blocked ? "blocked" : ""}`}>
+            <li key={m.id} className={`${(speakingId ? m.id === speakingId : i === now) ? "now" : i > now ? "later" : ""} ${blocked ? "blocked" : ""}`}>
               <button
                 onClick={() => {
                   onSeek(m.t + 0.01);
