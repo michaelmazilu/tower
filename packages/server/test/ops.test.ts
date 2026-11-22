@@ -193,6 +193,25 @@ describe("live operations", () => {
     expect(story.slice(-3)).toEqual(["You took over", "You gave it priority to land on 23", "You called paramedics to gate 173"]);
   });
 
+  it("never calls a closed runway clear", () => {
+    const host = demo();
+    host.stepOnce(10);
+    host.sim.closedRunways = ["06L/24R"];
+    const { around } = (host.ops as any).surroundings(host.sim.get("DAL482")!);
+    expect(around).toMatch(/Runway 24R is closed/);
+    expect(around).not.toMatch(/is clear/);
+  });
+
+  it("retells an instruction with the gate it named", () => {
+    const host = demo();
+    host.stepOnce(10);
+    const ac = host.sim.get("DLH471")!;
+    host.sim.clearances.set("test", { id: "test", aircraftId: ac.id, type: "TAXI", gate: "173", transmissionId: "line" } as any);
+    const line = { id: "line", t: 1, from: "operator", kind: "clearance", text: "DLH471, taxi to gate 173.", decision: { action: "TAXI", verdict: "accepted" } };
+    const story = (host.ops as any).story(ac, { record: { markers: [], messages: [line] } });
+    expect(story.at(-1).text).toBe("You told it to taxi to gate 173");
+  });
+
   it("warns before handback when help the agent will not call has not been called", () => {
     const host = demo();
     host.stepOnce(450);
