@@ -141,14 +141,16 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
   // Focus: while a person works a flight they hold, only an emergency interrupts them.
   // Everything else waits, counted, and comes back when they hand back or close the flight.
   const focused = summary?.attention === "human_control" && !replaying;
+  const asking = new Set(ops.flights.filter((f) => f.attention === "human_requested").map((f) => f.id));
   const unseen = ops.alerts.filter((a) => !a.acknowledged);
   // The open flight's card already says what its alerts say; the banner is for the rest of the airport.
   const briefed = !replaying && summary?.brief ? summary.id : null;
   const alert = unseen
     .filter((a) => a.flightId !== briefed || !a.flightId)
-    .filter((a) => a.level === "critical" || !focused)
+    // A pilot asking for a person is never held back, even while you work another flight.
+    .filter((a) => a.level === "critical" || !focused || asking.has(a.flightId ?? ""))
     .sort((a, b) => SEVERITY[b.level] - SEVERITY[a.level] || b.t - a.t);
-  const heldAlerts = focused ? unseen.filter((a) => a.level !== "critical" && a.level !== "normal").length : 0;
+  const heldAlerts = focused ? unseen.filter((a) => a.level !== "critical" && a.level !== "normal" && !asking.has(a.flightId ?? "")).length : 0;
   const separation = useMemo(() => (stored ? separationAt(stored, t) : null), [stored, t]);
   // Where responders are standing by, by the flight they are waiting for.
   const responding = ops.alerts.filter((a) => a.flightId && a.level === "critical" && a.detail.includes("fire + rescue")).map((a) => a.flightId!);
@@ -204,6 +206,7 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
                 setPlaying(false);
               }}
               onClose={() => select(null)}
+              plain
               nameOf={nameOf}
               action={summary && <TakeOverKey flight={summary} operator={operator} />}
               briefing={!replaying && summary?.brief ? <NeedsYou flight={summary} operator={operator} heldAlerts={heldAlerts} messages={record?.messages ?? NO_MESSAGES} responders={stored ? respondersAt(stored, t) : null} /> : undefined}

@@ -33,7 +33,7 @@ If the room is loud, type in the box: everything else works the same. Ask the vi
 
 ### Act 2, optional: let them supervise
 
-Hand the laptop to someone outside the team, press **restart**, and say only: "You just became an air traffic controller. Your coworker will call you when it needs you." At about 0:30 DLH471 calls for a person. Let them read the card, press **Take over and send both**, then **Hand back to agent**. They should not need you to explain anything: that is the point.
+Hand the laptop to someone outside the team, click **2 operations**, press **restart**, and say only: "You just became an air traffic controller. Your coworker will call you when it needs you." At about 0:30 DLH471 calls for a person. Let them read the card, press **Take over and send both**, then **Hand back to agent**. They should not need you to explain anything: that is the point.
 
 ### Act 2: Pearson operations (about 1:00, stop at the mayday)
 
@@ -41,7 +41,7 @@ The **skip to** key (bottom right) always names the next scripted beat and runs 
 
 | Sim clock | Do | Say |
 |---|---|---|
-| 0:00 | Press **restart**. Let it talk. | "This is your coworker's first shift at Toronto Pearson. Map on the left, every flight on the right, sorted by who needs you. You are hearing it work the radio with the pilots." |
+| 0:00 | Click **2 operations** (the app opens on the cockpit), then press **restart**. Let it talk. | "This is your coworker's first shift at Toronto Pearson. Map on the left, every flight on the right, sorted by who needs you. You are hearing it work the radio with the pilots." |
 | 0:14 | Two boxes turn red. | "A departure rolled onto the runway in front of an arrival. Within seconds the arrival is sent around and the intruder is stopped. Nobody asked it to." |
 | 0:26 | Click the red **DLH471** box. | "It knows when to ask for help, and it doesn't dump the problem on you. Like one controller briefing another: what's wrong, where the plane is, five minutes to decide, and what to do." |
 | 0:35 | **Take over and send both**. | "One press: I have the aircraft, the agent is locked out, and its two calls go out in my name, after the validator. It sends exactly what I saw; if the picture had changed it would refuse and ask me to look again." Point at the focus line: "Routine alerts wait until I'm done. Emergencies still come through." |

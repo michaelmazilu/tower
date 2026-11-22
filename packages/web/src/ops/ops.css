@@ -297,3 +297,10 @@
 .box-need-plain::before { content: none; }
 .box-need-plain { font-weight: 700; }
 .ask-responders { font-weight: 700; }
+/* Reading the log: the header keeps the headline and the clock, and gives the rest of the room to the radio. */
+.ask-radio-mode .ask-what { padding: 8px 16px; }
+.ask-radio-mode .ask-what p, .ask-radio-mode .ask-what small { display: none; }
+.ask-radio-mode .ask-what h3 { font-size: 18px; }
+.ask-radio-mode .ask-clock { padding: 6px 14px; }
+.ask-radio-mode .ask-clock b { font-size: 22px; }
+.ask-radio-mode .ask-clock span { display: none; }
