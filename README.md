@@ -1,14 +1,14 @@
 # TowerAI
 
-**We are going to give every air traffic controller a coworker.**
+**We are going to help solve the global air traffic control crisis.**
 
-On November 13, America stopped taking off. One air traffic control failure [halted departures nationwide](https://www.faa.gov/newsroom/faa-statement-nationwide-ground-stop) for over four hours, [disrupting hundreds of thousands of travelers](https://www.cnbc.com/2026/11/13/faa-ground-stop.html). Our skies depend on this system, yet it rests on [roughly 11,000 U.S. controllers](https://www.politifact.com/article/2026/may/26/air-traffic-control-staffing-target-FAA-hiring/), many working [ten-hour days, six days a week](https://www.npr.org/2025/07/17/nx-s1-5453878/air-traffic-controllers-sean-duffy-faa). They don't need to be replaced. They need backup.
+[5.1 billion passengers](https://www.iata.org/en/pressroom/2026-releases/06-07-middle-east-disruptions-high-fuel-prices-halve-airline-industry-profitability/) will trust their lives to air traffic control this year, yet the world needs [71,000 new controllers by 2034](https://aviationnews.eu/?p=129204), and each takes years to train. In March, two pilots died in a runway collision at LaGuardia while an [overnight tower crew of two covered the work of several](https://npr.org/2026/03/24/nx-s1-5759710/laguardia-airport-plane-crash). On November 13, a single system failure [stopped every departure in America](https://www.faa.gov/newsroom/faa-statement-nationwide-ground-stop). The world is asking too few people to keep too many lives safe. We need a better way to protect the people in the sky, and the people guiding them home.
 
-Using ElevenLabs, we built an AI coworker that works the radio beside the controller, speaking with pilots in real aviation phraseology in a live simulation of Toronto Pearson.
+Using ElevenLabs, we built the coworker every controller deserves: one that works the radio beside them, speaks to pilots in real aviation language, and never gets tired.
 
-TowerAI watches every aircraft, handles routine clearances, and checks each one against safety rules before it is spoken. It flags the flights at highest risk, explains every decision, and calls a human when judgment matters. With one click, the controller takes over. With another, they hand it back.
+TowerAI watches every aircraft in a live simulation of Toronto Pearson to spot danger as it develops. It then handles routine clearances, checks each against safety rules before it is spoken, sends aircraft around blocked runways, alerts emergency crews, explains every decision, and immediately calls the controller when human judgment matters, so they can take over with one click and focus on saving lives.
 
-It never gets tired, always shows its work, and knows when to ask for help. **That's a coworker we'd hire.**
+**No controller should ever have to carry the sky alone. With TowerAI, they won't.**
 
 *This is a simulation, not a system for real traffic. The live demo runs a rules controller so it is reliable; the ElevenLabs agents are optional, and their recorded decisions are labelled `llm`. [What is real and what is modelled](docs/DEMO.md#real-and-modelled).*
 
