@@ -66,6 +66,30 @@ export interface FlightSummary {
   /** What the pilot needs right now, if anything. */
   need: string | null;
   lastMessage: string | null;
+  /** Live only: present while a person is needed or has control. Not replayed. */
+  brief?: HandoffBrief;
+}
+
+/**
+ * The agent's briefing to the person taking a flight, shaped like the briefing
+ * one controller gives another when relieving a position. Derived by rules
+ * from simulation state; no model writes it.
+ */
+export interface HandoffBrief {
+  /** What is wrong, in a few words: "Passenger medical emergency". */
+  problem: string;
+  /** Where the flight is, in plain words: "Landing on runway 23, 14 miles out, about 5 min from touchdown." */
+  context: string;
+  /** Time left to decide before the flight acts on its own. Null when nothing forces the pace. */
+  deadline: { inS: number; then: string } | null;
+  /** What to do now, in order, in plain words. Accepting sends exactly these, in the person's name. */
+  recommend: { clearanceType: string; label: string; why: string }[];
+  /** What is true right now, in sentences: who is in control, what has been given, what is waiting. */
+  now: string[];
+  /** Held flights only: what the agent will and will not do if handed back. */
+  onHandback: string | null;
+  /** What the agent is in the middle of saying to this flight, if anything, and whether taking over would cancel it. */
+  agentDoing: { text: string; cancelledByTakeover: boolean } | null;
 }
 
 /** [t, lat, lon, altFt, gsKt, hdg, vsFpm], ascending t. */
@@ -233,6 +257,9 @@ export interface OperatorInstruction {
  *   GET  /api/ops/flights/:id/actions         { actions: { clearanceType, label }[] } valid operator choices now
  *   POST /api/ops/flights/:id/takeover        { ok, message? }
  *   POST /api/ops/flights/:id/instruct        OperatorInstruction -> { ok, message? }
+ *   POST /api/ops/flights/:id/accept          { steps: clearanceType[] } -> { ok, message? }; takes control if
+ *                                             needed, then sends the agent's recommendation as shown, or refuses
+ *                                             if it has changed since
  *   POST /api/ops/flights/:id/handback        { ok, message? }
  *   POST /api/ops/alerts/:id/ack              { ok }
  *   POST /api/demo/restart                    { ok }, restarts the judge scenario from t = 0

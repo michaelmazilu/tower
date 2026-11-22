@@ -87,6 +87,63 @@ describe("live operations", () => {
     expect(host.verifyReplay().match).toBe(true);
   });
 
+  it("briefs the person before takeover, sends only what was shown, and says what the agent picks up", () => {
+    const host = demo();
+    host.stepOnce(450);
+    const brief = () => host.opsState().flights.find((f) => f.id === "DLH471")!.brief!;
+    const before = brief();
+    expect(before.problem).toBe("Passenger medical emergency");
+    expect(before.context).toMatch(/^Landing on runway 23, \d+ miles out, about \d+ min from touchdown\.$/);
+    expect(before.deadline?.then).toBe("it has to abort the landing");
+    expect(before.deadline!.inS).toBeGreaterThan(60);
+    expect(before.now).toEqual(["The agent is still handling DLH471 until you take over.", "It is not cleared to land yet."]);
+    expect(before.recommend.map((r) => r.label)).toEqual(["Give it priority to land on 23", "Call paramedics to gate 173"]);
+    expect(before.onHandback).toBeNull();
+
+    // Approval is for what was on screen, nothing else.
+    expect(host.ops.accept("DLH471", ["ALERT_MEDICAL"]).ok).toBe(false);
+    expect(host.sim.get("DLH471")!.humanControl).toBeFalsy();
+
+    const accepted = host.ops.accept("DLH471", ["PRIORITY_LANDING", "ALERT_MEDICAL"]);
+    expect(accepted).toMatchObject({ ok: true, message: expect.stringMatching(/^You have DLH471\. Sent: .*number one.*Paramedics/) });
+    const after = brief();
+    expect(after.recommend).toEqual([]);
+    expect(after.now).toEqual([
+      "You are in control. The agent will not talk to DLH471.",
+      "It has priority to land on runway 23.",
+      "Paramedics are on their way to gate 173.",
+      "It is not cleared to land yet.",
+    ]);
+    expect(after.onHandback).toBe("The agent will clear it to land on 23 ahead of other traffic once the runway is free.");
+    expect(host.ops.handback("DLH471").message).toBe(`The agent has DLH471. ${after.onHandback}`);
+    expect(host.opsState().flights.find((f) => f.id === "DLH471")!.brief).toBeUndefined();
+    expect(host.verifyReplay().match).toBe(true);
+  });
+
+  it("says a runway conflict in plain words, and that the agent is already on it", () => {
+    const host = demo();
+    host.stepOnce(145);
+    const brief = (id: string) => host.opsState().flights.find((f) => f.id === id)!.brief!;
+    expect(brief("WJA302")).toMatchObject({
+      problem: "On runway 23 without permission",
+      context: "ACA214 is coming in to land on that runway, 2 miles out.",
+      agentDoing: { text: "telling WJA302 to stop where it is", cancelledByTakeover: true },
+    });
+    expect(brief("ACA214")).toMatchObject({
+      problem: "Its runway is blocked",
+      context: expect.stringMatching(/^WJA302 is on runway 23\. ACA214 is \d+ miles out/),
+      agentDoing: { text: "telling ACA214 to abort the landing and climb away" },
+    });
+    for (const id of ["WJA302", "ACA214"]) expect(JSON.stringify(brief(id))).not.toMatch(/reserved|05\/23|NM/);
+  });
+
+  it("warns before handback when help the agent will not call has not been called", () => {
+    const host = demo();
+    host.stepOnce(450);
+    expect(host.ops.takeover("DLH471").message).toBe("You have DLH471.");
+    expect(host.opsState().flights.find((f) => f.id === "DLH471")!.brief!.onHandback).toMatch(/will not call paramedics/);
+  });
+
   it("refuses cross-origin changes and keeps the dev proxy working", () => {
     const ask = (host: string, origin?: string) =>
       refusal({ method: "POST", headers: { host, origin } } as IncomingMessage, { host: "127.0.0.1", origins: [] });

@@ -200,3 +200,58 @@
 .glyph-restart { width: 12px; height: 12px; position: relative; }
 .glyph-restart::before { content: ""; position: absolute; left: 0; width: 3px; height: 12px; background: currentColor; }
 .glyph-restart::after { content: ""; position: absolute; right: 0; border: 6px solid transparent; border-right: 9px solid currentColor; border-left: 0; }
+
+/* A flight that needs you: what is wrong, where it is, how long, what to do. */
+.fd > .ask { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.ask > * { flex: none; }
+.ask { background: var(--white); color: var(--black); border-bottom: 3px solid var(--red); }
+.ask-held { border-bottom-color: var(--black); }
+.ask small { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 700; color: var(--grey-600); }
+.ask-top { display: flex; align-items: stretch; background: var(--red); color: var(--white); }
+.ask-held .ask-top { background: var(--black); }
+.ask-what { flex: 1; min-width: 0; padding: 12px 16px; }
+.ask-top small { color: inherit; opacity: 0.85; }
+.ask-what h3 { margin: 0; font-size: 22px; line-height: 1.15; }
+.ask-what p { margin: 4px 0 0; font-size: 14px; }
+.ask-clock { flex: none; width: 128px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; border-left: 1px solid rgb(255 255 255 / 0.35); }
+.ask-clock b { font: 700 30px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.ask-clock span { margin-top: 4px; font-size: 12px; line-height: 1.25; }
+.ask-urgent { background: var(--white); color: var(--red); }
+.ask-do { padding: 12px 16px; }
+.ask-do ol { margin: 0; padding-left: 22px; font-size: 17px; font-weight: 700; line-height: 1.4; }
+.ask-do p { margin: 0; font-size: 15px; }
+.ask-keys { margin-top: 10px; display: flex; gap: 8px; }
+.ask-keys button { min-height: 48px; padding: 6px 14px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; text-align: left; border: 2px solid var(--black); background: var(--white); color: var(--black); cursor: pointer; }
+.ask-keys button b { font: 700 15px/1.15 var(--sans); }
+.ask-keys button span { font-size: 12px; font-weight: 400; }
+.ask-back button { height: 40px; padding: 0 18px; border: 2px solid var(--black); background: var(--white); color: var(--black); font: 700 15px var(--sans); cursor: pointer; }
+.ask-keys .ask-yes { background: var(--red); border-color: var(--red); color: var(--white); min-width: 140px; }
+.ask-keys button:hover:not(:disabled), .ask-back button:hover:not(:disabled) { background: var(--black); border-color: var(--black); color: var(--white); }
+.ask-keys button:disabled, .ask-back button:disabled { opacity: 0.5; cursor: default; }
+.ask-sofar { margin: 0; padding: 8px 16px; border-top: var(--line); font-size: 13px; line-height: 1.35; }
+.ask-refused { margin: 0; padding: 8px 16px; border-top: var(--line); color: var(--red); font-weight: 700; font-size: 13px; }
+.ask-back { padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-top: var(--line); }
+.ask-back p { flex: 1; margin: 0; font-size: 13px; line-height: 1.35; }
+.ask-back button { flex: none; }
+.ask-quiet { margin: 0; padding: 5px 16px; border-top: var(--line); font-size: 12px; color: var(--grey-600); }
+.instruct-more summary { padding: 8px 16px; font-size: 12px; font-weight: 700; color: var(--grey-600); cursor: pointer; }
+.ask-now { padding: 10px 16px; border-bottom: var(--line); background: var(--grey-100); }
+.ask-now ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.4; }
+.ask-do { border-bottom: var(--line); }
+.ask-note { margin: 8px 0 0 !important; font-size: 12px !important; color: var(--grey-600); }
+.ask-radio { flex: 1 1 auto; min-height: 120px; display: flex; flex-direction: column; border-top: var(--line); }
+.ask-radio > small { flex: none; padding: 8px 16px 6px; margin: 0; }
+.ask-radio > small span { margin-left: 8px; font-weight: 400; color: var(--grey-400); }
+.ask-radio ol { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0 16px 10px; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.ask-radio-empty { font-size: 13px; color: var(--grey-600); }
+.ask-msg { max-width: 86%; padding: 6px 10px; border: 1px solid var(--grey-200); background: var(--white); }
+.ask-msg div { display: flex; gap: 8px; align-items: baseline; font-size: 11px; color: var(--grey-600); }
+.ask-msg time { font-family: var(--mono); }
+.ask-msg b { color: var(--black); font-size: 12px; }
+.ask-msg button { margin-left: auto; padding: 0; border: 0; background: none; color: var(--grey-600); font-size: 11px; text-decoration: underline; cursor: pointer; }
+.ask-msg p { margin: 2px 0 0; font-size: 13px; line-height: 1.35; }
+.ask-msg-pilot { align-self: flex-start; background: var(--grey-100); }
+.ask-msg-agent { align-self: flex-end; }
+.ask-msg-you { align-self: flex-end; background: var(--black); border-color: var(--black); }
+.ask-msg-you div, .ask-msg-you b, .ask-msg-you p, .ask-msg-you button { color: var(--white); }
+.ask-wait { font-weight: 700; }

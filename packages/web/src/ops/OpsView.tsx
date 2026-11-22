@@ -6,7 +6,7 @@ import type { Sound } from "../shared/sound";
 import { AirportMap } from "./AirportMap";
 import { FlightGrid } from "./FlightGrid";
 import { OnAir } from "./OnAir";
-import { TakeOverKey, OperatorPanel, useOperator } from "./Operator";
+import { NeedsYou, TakeOverKey, OperatorPanel, useOperator } from "./Operator";
 import { get, post, type OpsLink } from "./useOps";
 import { useReplay } from "./useReplay";
 import "./ops.css";
@@ -138,10 +138,14 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
 
   const t = cursor ?? ops.t;
   const operator = useOperator(selectedId, summary?.attention === "human_control", link.refresh);
-  const alert = ops.alerts
-    // The person holding the flight needs the room for the controls more than its own alert.
-    .filter((a) => !a.acknowledged && (a.level === "critical" || !(summary?.attention === "human_control" && a.flightId === summary.id)))
+  // Focus: while a person works a flight they hold, only an emergency interrupts them.
+  // Everything else waits, counted, and comes back when they hand back or close the flight.
+  const focused = summary?.attention === "human_control" && !replaying;
+  const unseen = ops.alerts.filter((a) => !a.acknowledged);
+  const alert = unseen
+    .filter((a) => a.level === "critical" || !focused)
     .sort((a, b) => SEVERITY[b.level] - SEVERITY[a.level] || b.t - a.t);
+  const heldAlerts = focused ? unseen.filter((a) => a.level !== "critical" && a.level !== "normal").length : 0;
   const separation = useMemo(() => (stored ? separationAt(stored, t) : null), [stored, t]);
   // Where responders are standing by, by the flight they are waiting for.
   const responding = ops.alerts.filter((a) => a.flightId && a.level === "critical" && a.detail.includes("fire + rescue")).map((a) => a.flightId!);
@@ -199,6 +203,7 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
               onClose={() => select(null)}
               nameOf={nameOf}
               action={summary && <TakeOverKey flight={summary} operator={operator} />}
+              briefing={!replaying && summary?.brief ? <NeedsYou flight={summary} operator={operator} heldAlerts={heldAlerts} messages={record?.messages ?? NO_MESSAGES} /> : undefined}
               controls={!replaying && summary && <OperatorPanel flight={summary} operator={operator} />}
             />
           ) : (

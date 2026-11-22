@@ -21,7 +21,7 @@ npm run judge
 
 Open http://127.0.0.1:8787. No key, no network, no credits. The click-by-click script, what is real and what is modelled, and recovery steps are in [docs/DEMO.md](docs/DEMO.md).
 
-- **Operations:** live Toronto Pearson. Map, a box per flight ranked by risk, replay of any flight, decisions with reasons and latency, and operator takeover and handback.
+- **Operations:** live Toronto Pearson. Map, a box per flight ranked by risk, replay of any flight, decisions with reasons and latency, and operator takeover and handback with a plain card when a flight needs a person: what is wrong, where it is, time to decide, what to do in one press, and what the agent will do on hand back ([why](docs/DEMO.md#the-handoff)).
 - **World:** a recorded 40-minute simulation of 59 controlled flights at 11 airports and 1,000 background flights, with every conversation, separation, risk and response time at any point of playback.
 
 | Command | |

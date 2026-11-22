@@ -33,7 +33,7 @@ If the room is loud, type in the box: everything else works the same. Ask the vi
 
 ### Act 2, optional: let them supervise
 
-Hand the laptop to someone outside the team, press **restart**, and say only: "You just became an air traffic controller. Your coworker will call you when it needs you." At about 0:30 DLH471 calls for a person. Let them find **take over**, **Priority landing 23** and **hand back**.
+Hand the laptop to someone outside the team, press **restart**, and say only: "You just became an air traffic controller. Your coworker will call you when it needs you." At about 0:30 DLH471 calls for a person. Let them read the card, press **Take over and send both**, then **Hand back to agent**. They should not need you to explain anything: that is the point.
 
 ### Act 2: Pearson operations (about 1:00, stop at the mayday)
 
@@ -43,9 +43,9 @@ The **skip to** key (bottom right) always names the next scripted beat and runs 
 |---|---|---|
 | 0:00 | Press **restart**. Let it talk. | "This is your coworker's first shift at Toronto Pearson. Map on the left, every flight on the right, sorted by who needs you. You are hearing it work the radio with the pilots." |
 | 0:14 | Two boxes turn red. | "A departure rolled onto the runway in front of an arrival. Within seconds the arrival is sent around and the intruder is stopped. Nobody asked it to." |
-| 0:26 | Click the red **DLH471** box. | "It knows when to ask for help. This pilot needs a person, so it called you. This is what they need, the conversation, why the controller said each thing, and how long each response took." |
-| 0:35 | **take over**, then **Priority landing 23** or **Alert paramedics**. | "I have the aircraft and the agent is locked out. What I say goes out ahead of routine calls, and clearances pass the same validator." |
-| 0:45 | **hand back**. Drag the scrubber back, then **go live**. | "Control returns to the agent, and any moment can be replayed with the traffic around it." |
+| 0:26 | Click the red **DLH471** box. | "It knows when to ask for help, and it doesn't dump the problem on you. Like one controller briefing another: what's wrong, where the plane is, five minutes to decide, and what to do." |
+| 0:35 | **Take over and send both**. | "One press: I have the aircraft, the agent is locked out, and its two calls go out in my name, after the validator. It sends exactly what I saw; if the picture had changed it would refuse and ask me to look again." Point at the focus line: "Routine alerts wait until I'm done. Emergencies still come through." |
+| 0:45 | Read the line beside **Hand back to agent**, then press it. Drag the scrubber back, then **go live**. | "Before I let go, it tells me what it will do, and what it won't. Then it confirms it has the aircraft, and any moment can be replayed." |
 | 0:58 | **all flights**. | "Weather goes to everyone." The go-around also gets a heading, altitude and speed, read back. |
 | 1:18 | Press **skip to mayday** if needed. Click **UAL119**. | "Engine failure. Roger mayday, a heading, an altitude, number one, then fire and rescue, who answer. Responders are the squares by the runway." |
 | 1:50 | Press **skip to closure** if needed. | "A runway closes. Permissions go at once, but nobody changes runway until the new one has been read back." |
@@ -67,6 +67,21 @@ Turn **sound** on. Click any aircraft and its conversation plays. With `judge:ta
 | **all flights**, **60x**, let it run. | "Every conversation, every decision, replayable at any second." |
 
 More moments, by clicking the timeline or searching: `JBU523` (weather deviation blocked by traffic, 13:11), `UAL408` (altitude refused), `AFR083` (hydraulic failure, human takeover, 13:15), `ANA861` (depressurisation, 13:28), `TAM8084` (a request for a human left open).
+
+## The handoff
+
+Handing a live situation from automation to a person is where automation tends to fail people. The person was out of the loop, has to rebuild the picture under time pressure, and does not know what the machine was about to do (Bainbridge, *Ironies of Automation*, 1983). Air traffic control already has an answer for person to person: a position relief briefing from a checklist, and an explicit transfer of the position. TowerAI uses the same shape for agent to person.
+
+| Stress | What TowerAI does |
+|---|---|
+| "How long do I have?" | A big clock beside the problem: seconds until the flight acts on its own (an approach with no landing clearance goes around at 1 NM). It is computed from the path the aircraft will fly. Under 45 s it turns red. |
+| Rebuilding the picture | Plain words, no scores or codes: what is wrong, where the plane is, what is happening now (who is in control, what has been given, what is still missing), what to do, and the full radio log between the agent, the plane and you. The numbers and risk scores are hidden while a person is needed; reasons are on hover. |
+| Composing under pressure | **Take over and send both** takes control and sends the recommended steps in the person's name, through the same validator. Approving is easier than composing. **Take over, send nothing** takes control without sending anything; other instructions are one click away. The card says that either button gives the person control. |
+| Approving something that has changed | The press carries exactly the steps that were shown. If the recommendation has changed, nothing is sent and the person is asked to look again. |
+| Automation surprise on takeover | Taking over withdraws anything the agent had decided but not said, and the confirmation names it. |
+| Everything else still shouting | While a person holds a flight, routine alerts wait, counted, until they hand back. Critical alerts still interrupt. The agent keeps every other flight. |
+| Letting go blind | Before hand back, the briefing says what the agent will do and what it will not (for example, it will not call paramedics). After, it confirms: "The agent has DLH471." |
+| Is it honest? | The briefing is rules over simulation state, not a model. Tests check the recommendation, the refusal when it has changed, and that the agent does what the hand back line promised. |
 
 ## Real and modelled
 
