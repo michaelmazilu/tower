@@ -151,6 +151,8 @@ export interface FlightRecord {
   track: TrackPoint[];
   messages: Message[];
   markers: Marker[];
+  /** Storyline flights only: a click opens on the first line at or after this t. */
+  opensAt?: number;
   /** Step functions: the value holds until the next sample. */
   riskSeries: { t: number; risk: Risk; attention: Attention; need: string | null; status: string; position: ControlPosition; facility: string }[];
   separation: SeparationSample[];
