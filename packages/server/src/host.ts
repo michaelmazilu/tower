@@ -135,7 +135,7 @@ export class SimHost {
   setController(mode: ControllerMode): void {
     let next: BaselineController | AtcController | null = null;
     if (mode === "elevenlabs") {
-      if (!this.options.createAgent) throw new Error("Set ELEVENLABS_API_KEY to enable the tower agent (npm run judge:live).");
+      if (!this.options.createAgent) throw new Error("The tower agent needs a key and an agent id from agents/setup.ts (npm run judge:live).");
       if (!this.paused) next = new AtcController(this.sim, this.gateway, this.options.createAgent());
     } else if (mode === "baseline") {
       next = new BaselineController(this.sim, this.gateway).attach();

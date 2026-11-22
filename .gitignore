@@ -1,6 +1,8 @@
 node_modules/
 dist/
 data/runs/
+packages/server/data/runs/
+packages/server/data/audio/live/
 .env
 .env.*
 !.env.example

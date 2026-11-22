@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Timing } from "@towerai/contracts";
 import type { ElevenLabs } from "../agents/client";
 import { dataPath, readData, writeData } from "../agents/data";
@@ -42,8 +43,9 @@ export interface VoicedLine {
   fromCache: boolean;
 }
 
-const AUDIO_DIR = dataPath("audio");
-const MANIFEST = dataPath("audio", "manifest.json");
+/** Committed recordings, and an ignored cache for whatever is voiced while the app runs. */
+const RECORDED = dataPath("audio");
+const LIVE = dataPath("audio", "live");
 
 /** All pilot lines of one flight map to one voice. */
 export function voiceFor(role: Line["role"], speaker: string) {
@@ -76,16 +78,18 @@ function voiced(file: string, entry: Entry, fromCache: boolean): VoicedLine {
 /** The file behind GET /api/audio/:file, or null. Only content addresses are accepted. */
 export function audioFile(name: string): string | null {
   if (!/^[0-9a-f]{24}\.mp3$/.test(name)) return null;
-  const path = dataPath("audio", name);
-  return existsSync(path) ? path : null;
+  return [RECORDED, LIVE].map((dir) => join(dir, name)).find((path) => existsSync(path)) ?? null;
 }
 
 /** Offline and free. */
-export function cachedLine(line: Line): VoicedLine | null {
+export function cachedLine(line: Line, committedOnly = false): VoicedLine | null {
   const { file } = address(line);
-  if (!audioFile(file)) return null;
-  const entry = readData<Record<string, Entry>>(MANIFEST, {})[file];
-  return entry ? voiced(file, entry, true) : null;
+  for (const dir of committedOnly ? [RECORDED] : [RECORDED, LIVE]) {
+    if (!existsSync(join(dir, file))) continue;
+    const entry = readData<Record<string, Entry>>(join(dir, "manifest.json"), {})[file];
+    if (entry) return voiced(file, entry, true);
+  }
+  return null;
 }
 
 /** The recording's length: FORMAT is a constant 32 kbit/s. */
@@ -94,13 +98,16 @@ export function cachedSeconds(line: Line): number | undefined {
   return path ? statSync(path).size / 4000 : undefined;
 }
 
-/** Serves the cache, and only with an `api` goes to the network. `fresh` is for latency measurement. */
+/**
+ * Serves the cache, and only with an `api` goes to the network. `fresh` is for latency measurement.
+ * `commit` is for recording scripts: the line joins the committed recordings.
+ */
 export async function voiceLine(
   line: Line,
-  options: { api?: ElevenLabs | null; fresh?: boolean; timeoutMs?: number } = {},
+  options: { api?: ElevenLabs | null; fresh?: boolean; commit?: boolean; timeoutMs?: number } = {},
 ): Promise<VoicedLine | null> {
   if (!options.fresh) {
-    const hit = cachedLine(line);
+    const hit = cachedLine(line, options.commit);
     if (hit) return hit;
   }
   const api = options.api;
@@ -129,8 +136,10 @@ export async function voiceLine(
       chunks.push(value);
     }
     if (firstByteMs === undefined) throw new Error("ElevenLabs returned no audio.");
-    mkdirSync(AUDIO_DIR, { recursive: true });
-    const path = dataPath("audio", file);
+    const dir = options.commit ? RECORDED : LIVE;
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, file);
+    const manifest = join(dir, "manifest.json");
     writeFileSync(`${path}.tmp`, Buffer.concat(chunks));
     renameSync(`${path}.tmp`, path);
     const entry: Entry = {
@@ -141,7 +150,7 @@ export async function voiceLine(
       firstByteMs,
       recordedAt: new Date().toISOString(),
     };
-    writeData(MANIFEST, { ...readData<Record<string, Entry>>(MANIFEST, {}), [file]: entry });
+    writeData(manifest, { ...readData<Record<string, Entry>>(manifest, {}), [file]: entry });
     return voiced(file, entry, false);
   });
 }

@@ -17,9 +17,9 @@
     "typecheck": "tsc -p packages/contracts --noEmit && tsc -p packages/core --noEmit && tsc -p packages/world --noEmit && tsc -p packages/server --noEmit && tsc -p packages/web --noEmit",
     "build": "npm run build -w @towerai/web",
     "judge": "npm run build && ELEVENLABS_API_KEY= TOWERAI_CONTROLLER=baseline TOWERAI_AI_PILOTS=off TOWERAI_SCENARIO=judge-demo TOWERAI_DATA_DIR=off TOWERAI_RADIO_CONTROLLER=simulated TOWERAI_RADIO_PILOTS=simulated tsx packages/server/src/index.ts",
-    "judge:talk": "npm run build && TOWERAI_TALK=on TOWERAI_CREDIT_CAP=9500 TOWERAI_CONTROLLER=baseline TOWERAI_AI_PILOTS=off TOWERAI_SCENARIO=judge-demo TOWERAI_DATA_DIR=off TOWERAI_RADIO_CONTROLLER=simulated TOWERAI_RADIO_PILOTS=simulated node --env-file=.env --import tsx packages/server/src/index.ts",
+    "judge:talk": "test -f .env || { echo 'No .env: run cp .env.example .env and add ELEVENLABS_API_KEY, or use npm run judge, which needs neither.'; exit 1; }; npm run build && TOWERAI_TALK=on TOWERAI_CREDIT_CAP=${TOWERAI_CREDIT_CAP:-9500} TOWERAI_CONTROLLER=baseline TOWERAI_AI_PILOTS=off TOWERAI_SCENARIO=judge-demo TOWERAI_DATA_DIR=off TOWERAI_RADIO_CONTROLLER=simulated TOWERAI_RADIO_PILOTS=simulated node --env-file=.env --import tsx packages/server/src/index.ts",
     "record:world": "tsx packages/server/src/agents/record-world.ts",
-    "judge:live": "npm run build && TOWERAI_CONTROLLER=elevenlabs TOWERAI_AI_PILOTS=on TOWERAI_CREDIT_CAP=9500 TOWERAI_SCENARIO=judge-demo TOWERAI_DATA_DIR=off TOWERAI_RADIO_CONTROLLER=simulated TOWERAI_RADIO_PILOTS=simulated node --env-file=.env --import tsx packages/server/src/index.ts"
+    "judge:live": "test -f .env || { echo 'No .env: run cp .env.example .env and add ELEVENLABS_API_KEY, or use npm run judge, which needs neither.'; exit 1; }; npm run build && TOWERAI_CONTROLLER=elevenlabs TOWERAI_AI_PILOTS=on TOWERAI_CREDIT_CAP=${TOWERAI_CREDIT_CAP:-9500} TOWERAI_SCENARIO=judge-demo TOWERAI_DATA_DIR=off TOWERAI_RADIO_CONTROLLER=simulated TOWERAI_RADIO_PILOTS=simulated node --env-file=.env --import tsx packages/server/src/index.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -28,6 +28,6 @@
     "vitest": "^2.1.8"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.6"
   }
 }

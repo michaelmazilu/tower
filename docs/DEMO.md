@@ -6,7 +6,7 @@
 npm run judge:talk
 ```
 
-Open **http://127.0.0.1:8787** in a full window, 1280x720 or larger. This is the full demo: a visitor talks to the tower and any world flight can be heard. It needs `ELEVENLABS_API_KEY` in `.env` and a network, and spends credits (at most about 100 for a new spoken exchange, about 30 for a repeated one, about 25 for each new world line heard), stopping at 9,500.
+Open **http://127.0.0.1:8787** in a full window, 1280x720 or larger. This is the full demo: a visitor talks to the tower and any world flight can be heard. It needs `ELEVENLABS_API_KEY` in `.env` and a network, and spends credits (up to about 150 for a new spoken exchange, up to 66 for a repeated one (transcription), typically about 35 and at most 84 for each new world line), stopping at 9,500.
 
 `npm run judge` is the fallback: no key, no network, no credits. The cockpit then takes typed input, and lines without a recording use the browser's voice.
 
@@ -75,12 +75,12 @@ More moments, by clicking the timeline or searching: `JBU523` (weather deviation
 | Pearson layout | Real, from OpenStreetMap. Runs offline. |
 | Traffic, weather, responders | Synthetic. The disruptions and supervisor lines are scripted. |
 | Safety validator, readbacks, replay | Real code. Nothing moves on a clearance that was not validated and read back. Stop instructions and go-arounds act when spoken. A crew in a mayday, or with no landing clearance at 1 NM, may break off on its own authority, and the log says so. |
-| Cockpit | Speech to text and voice are live ElevenLabs. Safety intents are understood by rules in milliseconds; anything the rules do not recognise goes to an ElevenLabs agent and is labelled `llm`. The agent can only choose among allowed intents, and the validator decides every clearance. Instruments, faults, responders and the human call are simulated. Simulated time runs up to 3x while lining up, rolling and returning. |
+| Cockpit | Speech to text and voice are live ElevenLabs. Safety intents are understood by rules in milliseconds; anything the rules do not recognise goes to an ElevenLabs agent and is labelled `llm`. The agent can only choose among allowed intents, its wording is never spoken, and the validator decides every clearance. Instruments, faults, responders and the human call are simulated. Simulated time runs up to 3x while lining up, rolling and returning. |
 | Operations controller and pilots | Rules by default, labelled `rules`. `npm run judge:live` swaps in the LLM. |
 | World decisions | 8 choices are real LLM calls (`llm`), replayed only for the identical prompt they answered: KLM643, VIR26, AAL100 and UAL1175, a controller and a pilot line each, in the first 25 seconds. Every other line is `rules`. |
-| Voice | The first two minutes of Operations are recorded ElevenLabs audio on the scripted path, including priority landing and paramedics, and three storylines in the world are too. With `judge:talk` any world line played is made live. These are labelled `recorded voice`. Later lines, and other operator choices, use a local browser voice, labelled `browser voice`. It is not ElevenLabs. |
-| Response time | In both acts it is the same thing: end of the call to on air, in simulated time, including any wait for the frequency. The cockpit shows wall-clock time on the server from the audio arriving to the reply being ready. It is not an LLM benchmark. `rules decide` under 1 ms is measured on this run. `llm decide` in Act 2 is measured on each recorded LLM line only. The pauses before rules lines in Act 2 are modelled. |
-| Separation and performance | Act 1: 3 NM or 1000 ft, 2.5 NM in trail on one final. Established finals far enough apart, and diverging climb-outs and missed approaches on other runways, are independent and are labelled `independent parallel`. Act 2: 3 NM below 15,000 ft and 5 NM above, or 1000 ft, with conflict detection ported from BlueSky (MIT) and flight segments from OpenAP code (LGPL-3.0). No data from either. Act 1 clearances include missed-approach vectors and the emergency return, not general vectoring. Act 2 also issues sequencing speeds, headings and levels. |
+| Voice | The first two minutes of Operations are recorded ElevenLabs audio on the scripted path, including priority landing and paramedics, and three storylines in the world are too. With `judge:talk` any world line played is made live. Operations labels these `recorded voice`; World labels them `ElevenLabs`, with `cached, 0 credits` or `made live`. Later lines, and other operator choices, use a local browser voice, labelled `browser voice`. It is not ElevenLabs. |
+| Response time | In Operations and World it is the same thing: end of the call to on air, in simulated time, including any wait for the frequency. The cockpit shows wall-clock time on the server from the audio arriving to the reply being ready. It is not an LLM benchmark. `rules decide` under 1 ms is measured on this run. `llm decide` in World is measured on each recorded LLM line only. The pauses before rules lines in World are modelled. |
+| Separation and performance | Operations: 3 NM or 1000 ft, 2.5 NM in trail on one final. Established finals far enough apart, and diverging climb-outs and missed approaches on other runways, are independent and are labelled `independent parallel`. World: 3 NM below 15,000 ft and 5 NM above, or 1000 ft, with conflict detection ported from BlueSky (MIT) and flight segments from OpenAP code (LGPL-3.0). No data from either. Operations clearances include missed-approach vectors and the emergency return, not general vectoring. World also issues sequencing speeds, headings and levels. |
 
 ### If asked how fast the agent is
 
@@ -102,7 +102,7 @@ It is a simulation, not a certified system. Do not claim it is safe for real tra
 npm run judge:live
 ```
 
-Needs `ELEVENLABS_API_KEY` in `.env`. The hosted tower makes the decisions and up to six pilot turns per run are LLM. It **spends**: about 30 credits a pilot turn and 45 or more a tower review, so roughly 300 in the first half minute. It stops at 9,500 credits counted in `packages/server/data/usage.json`, which is the same budget the cockpit and world voice use, so do not run it before a presentation. After three failures (network, cap or a rejected key) it hands to the rules controller and the label changes to say so. With no key at all it starts with the rules controller and says so. Every restart starts a new pilot budget. Present with `npm run judge`.
+Needs `ELEVENLABS_API_KEY` in `.env`. The hosted tower makes the decisions and up to six pilot turns per run are LLM. It **spends**: about 30 credits a pilot turn and 45 or more a tower review, so roughly 300 in the first half minute. It stops at 9,500 credits counted in `packages/server/data/usage.json`, which is the same budget the cockpit and world voice use, so do not run it before a presentation. After three failures (network, cap or a rejected key) it hands to the rules controller and the label changes to say so. Without `.env` it stops and says what to do. With an empty key, or before the agents are set up, it starts with the rules controller and says which is missing. Every restart starts a new pilot budget. Present with `npm run judge`.
 
 ## If something goes wrong
 
@@ -110,7 +110,7 @@ Needs `ELEVENLABS_API_KEY` in `.env`. The hosted tower makes the decisions and u
 |---|---|
 | Any screen looks odd | Reload the page. The simulation keeps running on the server. Press once anywhere to bring the sound back. |
 | The story has moved on, or a flight is stuck under your control | Press **restart**. |
-| No sound | **sound** must read `on`, at 1x. In Act 2 sound plays only with a flight open at 1x, and clicking a line replays it. |
+| No sound | **sound** must read `on`, at 1x. In World sound plays only with a flight open at 1x, and clicking a line replays it. |
 | `link lost` | Run `npm run judge` again. The page reconnects by itself. |
 | `EADDRINUSE` | An old server holds the port: `lsof -nP -iTCP:8787 -sTCP:LISTEN`, then `kill` that PID. |
 | World screen has no data | `npm run record:world` rebuilds it offline from the recorded choices and audio. |

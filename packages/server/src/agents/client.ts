@@ -6,6 +6,8 @@ export const HARD_CAP = 9500;
 const DEFAULT_CAP = 3500;
 /** The free tier allows four concurrent requests. One is left spare. */
 const MAX_IN_FLIGHT = 3;
+const READ_EVERY_MS = 60_000;
+const RETRY_FAILED_READ_MS = 3000;
 
 export interface Usage {
   remote: number;
@@ -44,17 +46,23 @@ export class CreditGuard {
     try {
       remote = await this.readRemote();
     } catch (error) {
-      this.remote = undefined;
+      this.failed();
       throw error;
     }
     if (!Number.isFinite(remote)) {
-      this.remote = undefined;
+      this.failed();
       throw new SpendLimitError("Could not read ElevenLabs usage, so nothing will be spent.");
     }
     const estimate = Math.max(remote, readData<Partial<Usage>>(this.file, {}).estimate ?? 0);
     this.remote = remote;
     writeData(this.file, { remote, estimate });
     return { remote, estimate };
+  }
+
+  /** Nothing is spent until a read succeeds, and the next one is due in seconds. */
+  private failed(): void {
+    this.remote = undefined;
+    this.lastReadAt = Date.now() - READ_EVERY_MS + RETRY_FAILED_READ_MS;
   }
 
   reserve(credits: number): void {
@@ -113,7 +121,7 @@ export class ElevenLabs {
    * still enforce the cap. A failed read still blocks spending, as before.
    */
   async prepare(): Promise<void> {
-    if (Date.now() - this.guard.lastReadAt >= 60_000) {
+    if (Date.now() - this.guard.lastReadAt >= READ_EVERY_MS) {
       this.batch = this.guard.refresh();
       // Background reads report failure through `guard.checked`, not as an unhandled rejection.
       this.batch.catch(() => undefined);

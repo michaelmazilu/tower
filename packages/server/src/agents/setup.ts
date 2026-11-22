@@ -1,8 +1,9 @@
 /**
- * Creates or updates the TowerAI agents and tools. Safe to re-run, spends no credits.
+ * Creates or updates the TowerAI agents, the cockpit's included, and their tools. Safe to re-run, spends no credits.
  * node --env-file=.env --import tsx packages/server/src/agents/setup.ts
  */
 import { agentConfig } from "../atc/config";
+import { setupCockpitAgent } from "../cockpit/brain";
 import { TOOL_PREFIX } from "../atc/elevenLabs";
 import { TTS_MODEL } from "../voice/voice";
 import { ElevenLabs } from "./client";
@@ -96,4 +97,6 @@ const ids: AgentIds = {
   pilot: await upsert("TowerAI Pilot", PILOT_PROMPT, 120),
 };
 writeData(dataPath("agents.json"), { ...readData<Record<string, unknown>>(dataPath("agents.json"), {}), ...ids, tts: TTS_MODEL, toolIds, updatedAt: new Date().toISOString() });
-console.log(ids, await api.guard.refresh());
+await setupCockpitAgent(api);
+// Not the ids: anyone holding one can spend the account's credits.
+console.log(`Tower, controller, pilot and cockpit agents are ready on ${LLM}.`, await api.guard.refresh());

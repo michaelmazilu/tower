@@ -55,6 +55,21 @@ test("spend is refused past the cap, before a check, and when the meter fails", 
   assert.throws(() => guard.reserve(1), SpendLimitError);
 });
 
+test("a failed meter read blocks spending for seconds, not a minute", async () => {
+  let reads = 0;
+  const api = new ElevenLabs("test-key", 5000, async () => Response.json({}));
+  Object.assign(api, { guard: new CreditGuard(async () => {
+    if (++reads === 1) throw new Error("429");
+    return 10;
+  }, 5000, join(dir, "retry.json")) });
+  await assert.rejects(api.prepare());
+  await assert.rejects(api.prepare());
+  assert.equal(reads, 1);
+  api.guard.lastReadAt -= 3000; // three seconds have passed
+  await api.prepare();
+  assert.equal(reads, 2);
+});
+
 test("only the first meter read is waited for; later reads run behind the call", async () => {
   let reads = 0;
   let release!: () => void;

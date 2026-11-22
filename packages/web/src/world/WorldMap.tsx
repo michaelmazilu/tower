@@ -101,13 +101,13 @@ export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) 
     setFree(false);
   };
   useEffect(() => {
-    if (selected || !free) return;
+    if (selected || picked || !free) return;
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !(e.target as Element).closest?.("input")) wholeWorld();
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
-  }, [selected, free]);
+  }, [selected, picked, free]);
 
   const shapes = useMemo(() => {
     const arcs = new Path2D();

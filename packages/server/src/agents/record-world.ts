@@ -83,10 +83,10 @@ for (const { summary, messages } of world.flights) {
     const responder = m.speaker.endsWith("(simulated)");
     const role = m.from === "pilot" || responder ? "pilot" : "controller";
     const line: Line = { role, speaker: responder ? m.speaker : summary.id, text: m.text };
-    let voiced = cachedLine(line);
+    let voiced = cachedLine(line, true);
     const storyline = MOMENTS.some(([id, from, to]) => id === summary.id && m.t >= from && m.t <= to);
     if (!voiced && storyline && args.includes("--voice")) {
-      voiced = await voiceLine(line, { api }).catch((error: unknown) => (console.error(String(error)), null));
+      voiced = await voiceLine(line, { api, commit: true }).catch((error: unknown) => (console.error(String(error)), null));
     }
     if (!voiced) continue;
     voicedLines++;

@@ -29,16 +29,6 @@ export const cockpitAgent = (): { llm: string; cockpit: string } | null => {
   return ids?.cockpit ? { llm: ids.llm, cockpit: ids.cockpit } : null;
 };
 
-/** Wording from a model may only be small talk: nothing that could be heard as an instruction. */
-export function safeSay(say: unknown): string | null {
-  if (typeof say !== "string") return null;
-  const text = say.trim();
-  if (!text || text.length > 200 || text.split(/\s+/).length > 20 || /[\d<>{}[\]\n]/.test(text)) return null;
-  const instruction =
-    /\b(?:clear(?:ed|ance)?|take\s?-?off|land(?:ing)?|line up|hold|taxi|cross|runway|heading|turn|climb|descend|maintain|go around|abort|push|contact|squawk|approved|roll|speed|throttle|evacuate|stop|continue|proceed|permission|free to|go ahead|you can (?:go|fly|leave)|responders|mayday|safe|emergency|crash\w*|altitude|knots|feet|engines?|fuel|smoke|fire|two|three|four|five|six|seven|eight|niner?|thousand|hundred)\b/i;
-  return instruction.test(text) ? null : text;
-}
-
 export interface AgentInput {
   heard: string;
   facts: string[];
@@ -50,7 +40,7 @@ export async function askAgent(
   api: ElevenLabs,
   agent: { llm: string; cockpit: string },
   input: AgentInput,
-): Promise<{ id: string; say: string | null; timing: Timing }> {
+): Promise<{ id: string; timing: Timing }> {
   const started = performance.now();
   const signal = AbortSignal.timeout(LLM_TIMEOUT_MS);
   const work = (async () => {
@@ -76,29 +66,17 @@ export async function askAgent(
   if (turn.status !== "completed") throw new Error(`Agent turn ended ${turn.status}.`);
   const json = /\{[\s\S]*\}/.exec((turn.output ?? []).map((o) => o.text).join(""))?.[0];
   if (!json) throw new Error("Agent reply was not JSON.");
-  const { id, say } = JSON.parse(json) as { id?: unknown; say?: unknown };
+  // Only the id is used. Model wording could repeat what a visitor said, and spoken lines are cached on disk.
+  const { id } = JSON.parse(json) as { id?: unknown };
   if (typeof id !== "string" || !input.options.some((o) => o.id === id)) throw new Error("Agent chose something that was not offered.");
   return {
     id,
-    say: id === "chat" || id === "help" ? safeSay(say) : null,
     timing: { stage: "decide", ms: Math.round(performance.now() - started), kind: "measured", source: `ElevenLabs agent (${agent.llm})` },
   };
 }
 
 /** Seconds of audio, read from the container where that is possible. */
 export function clipSeconds(b: Buffer): number | null {
-  if (b.length > 44 && b.toString("ascii", 0, 4) === "RIFF") {
-    const format = b.indexOf("fmt ");
-    const data = b.indexOf("data", format + 4);
-    if (format < 0 || data < 0 || format + 20 > b.length) return null;
-    const rate = b.readUInt32LE(format + 16);
-    return rate ? (b.length - data - 8) / rate : null;
-  }
-  if (b.length > 27 && b.toString("ascii", 0, 4) === "OggS") {
-    const last = b.lastIndexOf("OggS");
-    if (last + 14 > b.length) return null;
-    return Number(b.readBigUInt64LE(last + 6)) / (b.includes("OpusHead") ? 48_000 : 44_100);
-  }
   if (b.length > 8 && b.toString("ascii", 4, 8) === "ftyp") return mp4Seconds(b);
   return b.length > 4 && b.readUInt32BE(0) === 0x1a45dfa3 ? webmSeconds(b) : null;
 }
@@ -156,8 +134,11 @@ export async function transcribe(api: ElevenLabs, audio: Buffer, contentType: st
   if (!audio.length) throw new ClipError("I got no audio. Hold the key while you talk.");
   if (audio.length > MAX_CLIP_BYTES) throw new ClipError("That clip is over 1 MB. Keep it under 12 seconds.");
   const type = contentType.split(";")[0]!.trim().toLowerCase();
-  if (!/^(?:audio\/[\w.+-]+|video\/webm)$/.test(type)) throw new ClipError("Send recorded audio.");
+  const webm = /^(?:audio|video)\/webm$/.test(type) && audio.length > 4 && audio.readUInt32BE(0) === 0x1a45dfa3;
+  const mp4 = type === "audio/mp4" && audio.length > 8 && audio.toString("ascii", 4, 8) === "ftyp";
+  if (!webm && !mp4) throw new ClipError("Send recorded audio.");
   const seconds = clipSeconds(audio);
+  if ((webm && seconds === null) || (seconds !== null && seconds <= 0)) throw new ClipError("I couldn't read that clip. Try again.");
   if ((seconds ?? 0) > MAX_CLIP_SEC + 0.5 || (seconds === null && audio.length > MAX_UNMEASURED_BYTES)) {
     throw new ClipError("That was over 12 seconds. Try a shorter call.");
   }
@@ -184,7 +165,7 @@ export async function transcribe(api: ElevenLabs, audio: Buffer, contentType: st
   return { text: typeof text === "string" ? text.trim() : "", ms: Math.round(performance.now() - started) };
 }
 
-/** Idempotent, spends no credits, and keeps every other field in agents.json. Run it after agents/setup.ts. */
+/** Idempotent, spends no credits, and keeps every other field in agents.json. agents/setup.ts calls it last. */
 export async function setupCockpitAgent(api: ElevenLabs): Promise<string> {
   const file = dataPath("agents.json");
   const saved = readData<Partial<AgentIds> | null>(file, null);

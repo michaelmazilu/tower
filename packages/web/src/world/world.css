@@ -412,6 +412,7 @@
   color: var(--grey-200);
   font-size: 12px;
 }
+.wv .wv-bgcard .wv-key { color: var(--black); }
 .wv-bgcard-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .wv-bgcard-head b { color: var(--white); font-family: var(--mono); }
 .wv-bgcard-head span { color: var(--grey-400); flex: 1; }

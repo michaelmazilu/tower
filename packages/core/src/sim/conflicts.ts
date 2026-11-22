@@ -86,6 +86,19 @@ export function detectConflicts(sim: Simulation): void {
         });
       }
     }
+    // Someone rolled onto a runway without a clearance, whether or not anyone holds it.
+    for (const occupant of state.occupants) {
+      const flags = sim.get(occupant)?.flags;
+      if (holder || !(flags?.incursionActive || flags?.incursionHold)) continue;
+      add({
+        key: `incursion:${state.id}:${occupant}`,
+        type: "runway_incursion",
+        severity: "critical",
+        aircraftIds: [occupant],
+        runwayId: state.id,
+        description: `${occupant} is on runway ${state.id} without a clearance.`,
+      });
+    }
     // An arrival is close and the runway is not its own.
     for (const arr of arrivals) {
       if (arr.etaSec > 90) continue;

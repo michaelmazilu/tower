@@ -240,6 +240,11 @@ export function requestPhrase(r: {
 const NUMBER_WORDS: Record<string, string> = {
   zero: "0", oh: "0", one: "1", two: "2", three: "3", tree: "3", four: "4", fower: "4", five: "5",
   fife: "5", six: "6", seven: "7", eight: "8", nine: "9", niner: "9",
+  ten: "10", eleven: "11", twelve: "12", thirteen: "13", fourteen: "14", fifteen: "15", sixteen: "16",
+  seventeen: "17", eighteen: "18", nineteen: "19",
+};
+const TENS: Record<string, string> = {
+  twenty: "2", thirty: "3", forty: "4", fifty: "5", sixty: "6", seventy: "7", eighty: "8", ninety: "9",
 };
 
 /** Lower-case, digits as digits, "two three left" -> "23l". */
@@ -250,6 +255,13 @@ export function normalizeSpeech(text: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => NUMBER_WORDS[w] ?? w);
+  // "twenty three" is 23, and "twenty" alone is 20.
+  for (let i = 0; i < words.length; i++) {
+    const tens = TENS[words[i]];
+    if (!tens) continue;
+    const unit = /^[1-9]$/.test(words[i + 1] ?? "");
+    words.splice(i, unit ? 2 : 1, tens + (unit ? words[i + 1] : "0"));
+  }
   let out = "";
   for (let i = 0; i < words.length; i++) {
     const w = words[i];

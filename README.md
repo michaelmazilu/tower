@@ -119,21 +119,29 @@ Thresholds are in `DEFAULT_RULES` in [types.ts](packages/core/src/types.ts).
 
 The app's routes are documented at the end of [contracts](packages/contracts/src/index.ts), the simulation and tool routes at the top of [server/src/index.ts](packages/server/src/index.ts). `GET /health` is the health check and `/viewer` is a developer's view of the simulation (its 3D mode fetches Esri imagery; the demo never uses it).
 
-The server binds to 127.0.0.1 and refuses foreign hosts and origins. Set `TOWERAI_CORS_ORIGIN` for another origin, and `TOWERAI_SECRET` and `HOST` before exposing it.
+The server binds to 127.0.0.1 and refuses foreign hosts and origins. Set `TOWERAI_CORS_ORIGIN` for another origin, and `TOWERAI_SECRET` and `HOST` before exposing it. The bundled web app does not send the secret: set it only for API or webhook use, and leave it empty for the demo.
 
 ## Agents
 
-The tower, controller and pilot agents and their tools are created by an idempotent script, which spends no credits:
+`judge:talk` and `judge:live` need a key and, once per account, agents. Copy the example file and put `ELEVENLABS_API_KEY` in it:
+
+```bash
+cp .env.example .env
+```
+
+The tower, controller, pilot and cockpit agents and their tools are created by an idempotent script, which spends no credits. Run it again after changing a prompt:
 
 ```bash
 node --env-file=.env --import tsx packages/server/src/agents/setup.ts
 ```
 
-Agents never write safety-critical words: they call validated tools or pick from validated options, and any failure falls back to rules. Spending is capped in code at 9,500 credits (`TOWERAI_CREDIT_CAP` can lower it). How latency was measured, with its flaws, is in [docs/latency-results.md](docs/latency-results.md).
+Lines voiced while the app runs are kept in `packages/server/data/audio/live/`, which git ignores.
+
+Agents never write safety-critical words: they call validated tools or pick from validated options, and any failure falls back to rules. Spending is capped in code at 9,500 credits (lower it in the shell, for example `TOWERAI_CREDIT_CAP=500 npm run judge:talk`). How latency was measured, with its flaws, is in [docs/latency-results.md](docs/latency-results.md).
 
 ## Replay
 
-Every outside influence is a command logged with the tick it arrived on. Scenario + seed + commands reproduce a run exactly, with no controller or LLM involved. Runs are recorded to `data/runs/<runId>/` as `meta.json`, `events.jsonl` and `commands.jsonl`.
+Every outside influence is a command logged with the tick it arrived on. Scenario + seed + commands reproduce a run exactly, with no controller or LLM involved. `npm start` and `npm run dev` record runs to `packages/server/data/runs/<runId>/` as `meta.json`, `events.jsonl` and `commands.jsonl`.
 
 ## Honest limits
 
@@ -142,7 +150,7 @@ Every outside influence is a command logged with the tick it arrived on. Scenari
 - Pearson flight is 2D kinematics with altitude. There is no wind, no wake modelling beyond a fixed departure interval, and headings, altitudes and speeds only for missed approaches and emergency returns: other airborne conflicts are shown and alerted, not vectored. General vectoring is in the world simulation.
 - All traffic, weather and emergency responders are simulated. Supervisor lines in the world recording are scripted stand-ins.
 - The stand-in controller is first come first served and does not plan. Under heavy arrival streams it causes avoidable go-arounds and long waits. That is the gap the AI controller is meant to fill; its decision quality has not been measured.
-- Head-on taxi conflicts are prevented at clearance time rather than untangled afterwards, which costs some waiting at the gate or runway exit in busy periods. Stress runs (12 aircraft, one hour, 20 seeds) show no standoffs; a ring of aircraft each following the next is not formally ruled out, and `get_conflicts` would report it.
+- Head-on taxi conflicts are prevented at clearance time rather than untangled afterwards, which costs some waiting at the gate or runway exit in busy periods. The test suite runs 12 aircraft for 40 minutes on one seed on the real layout with no standoff; a ring of aircraft each following the next is not formally ruled out, and `get_conflicts` would report it.
 
 ## Credits
 

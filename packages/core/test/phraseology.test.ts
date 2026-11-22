@@ -26,6 +26,10 @@ describe("phraseology", () => {
   it("normalises spoken numbers into identifiers", () => {
     expect(normalizeSpeech("Runway two four right, cleared to land")).toBe("runway 24r cleared to land");
     expect(normalizeSpeech("zero six left")).toBe("06l");
+    expect(normalizeSpeech("twenty-four left")).toBe("24l");
+    expect(normalizeSpeech("ten thousand")).toBe("10 thousand");
+    expect(matchReadback({ type: "CLEARED_TAKEOFF", runway: "23" }, "cleared for takeoff runway twenty three").ok).toBe(true);
+    expect(matchReadback({ type: "CLEARED_TAKEOFF", runway: "23" }, "cleared for takeoff runway twenty four").ok).toBe(false);
   });
 
   it("accepts its own readback for every clearance type, written or spoken", () => {

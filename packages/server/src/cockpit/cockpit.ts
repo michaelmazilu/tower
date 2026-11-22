@@ -370,9 +370,9 @@ class Run {
     return { said: `${NAME}, ${said}`, intent, reason: "Instruction and numbers correct, so the clearance is active in the simulator.", action: { type: c.type, verdict: "accepted" } };
   }
 
-  answer(meaning: Meaning, heard: string, say?: string | null): Answer {
+  answer(meaning: Meaning, heard: string): Answer {
     if (meaning.kind === "claim") return this.crossCheck(meaning.claim, meaning.feet);
-    return this.topic(meaning.topic, heard, say ?? null);
+    return this.topic(meaning.topic, heard);
   }
 
   private crossCheck(claim: Claim, feet?: number): Answer {
@@ -509,7 +509,7 @@ class Run {
     return { said: `${NAME}, easy, I've got you. ${this.instruction(clearance).replace("runway", "Runway")}`, intent, reason: `${rules} The validator found the runway clear.`, action };
   }
 
-  private topic(topic: Topic, heard: string, say: string | null): Answer {
+  private topic(topic: Topic, heard: string): Answer {
     const v = this.vitals();
     const air = !v.onGround;
     const ac = this.me;
@@ -576,17 +576,16 @@ class Run {
       case "help":
         // "Help!" after reporting danger is not a request for a lesson.
         if (this.alarm && !waiting) return this.faults.size ? this.confirmed(topic, undefined, where, v) : this.escalate(topic);
-        if (say) return reply(say + (waiting ? prompt : ""), "The model's wording, checked for instructions.");
         if (waiting) return reply(`you're doing great. Just repeat the clearance.${prompt}`, "A readback is due.");
         if (ready) return reply("no experience needed. You're holding by the runway. Just say: ready for takeoff. I'll do the rest.", "Guidance for a beginner.");
         return reply(air ? "you're flying nicely. Ask me your height or traffic, or tell me if something's wrong." : `you're ${this.status()}. Ask me anything.`, "Guidance for where they are.");
       case "hello":
-        return reply(say ? say + (waiting ? prompt : "") : `Toronto Tower, loud and clear. I'll talk you through it.${prompt}`, "Greeting.");
+        return reply(`Toronto Tower, loud and clear. I'll talk you through it.${prompt}`, "Greeting.");
       case "thanks":
-        return reply(say ? say + (waiting ? prompt : "") : `any time.${prompt}`, "Thanks.");
+        return reply(`any time.${prompt}`, "Thanks.");
       case "unknown":
         if (this.alarm && /^\W*(?:yes|yeah|yep|yup|please|do it|send (?:them|it))\b/i.test(heard)) return this.faults.size ? this.confirmed("human", undefined, where, v) : this.escalate("human");
-        return reply(say ? say + (waiting ? prompt : "") : `I didn't follow that.${prompt || " Tell me what you need, or if something's wrong."}`, say ? "The model's wording, checked for instructions." : "No intent matched.");
+        return reply(`I didn't follow that.${prompt || " Tell me what you need, or if something's wrong."}`, "No intent matched.");
     }
   }
 
@@ -655,7 +654,6 @@ export function createCockpit({ api = null }: { api?: ElevenLabs | null } = {}) 
   async function answer(here: Run, heard: string, input: Exchange["input"], started: number, transcribeMs?: number): Promise<TalkResult> {
     const deciding = performance.now();
     let meaning = understand(heard);
-    let say: string | null = null;
     let brain: Exchange["brain"] = "rules";
     let note = "";
     let timing: Timing | null = null;
@@ -673,7 +671,6 @@ export function createCockpit({ api = null }: { api?: ElevenLabs | null } = {}) 
           if (here !== run) return { ok: false, message: "The cockpit was reset." };
           if (reply.id.startsWith("claim:")) meaning = { kind: "claim", claim: reply.id.slice(6) as Claim };
           else meaning = { kind: "topic", topic: reply.id === "chat" ? "unknown" : (reply.id as Topic) };
-          if (!here.troubled) say = reply.say;
           timing = reply.timing;
           brain = "llm";
           note = "Understood by the model. ";
@@ -683,7 +680,7 @@ export function createCockpit({ api = null }: { api?: ElevenLabs | null } = {}) 
           note = "The model did not answer, so rules did. ";
         }
       }
-      result = here.answer(meaning, heard, say);
+      result = here.answer(meaning, heard);
     }
     result.reason = note + result.reason;
     timing ??= {

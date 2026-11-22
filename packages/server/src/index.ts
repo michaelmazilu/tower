@@ -20,6 +20,7 @@ import { MAX_SPEED, MIN_SPEED, SimHost, isControllerMode } from "./host";
 import { towerFromEnv } from "./atc/elevenLabs";
 import { ElevenLabs } from "./agents/client";
 import { createCockpit, handleCockpit } from "./cockpit";
+import { cockpitAgent } from "./cockpit/brain";
 import { worldVoice } from "./voice/worldVoice";
 import { agentConfig } from "./atc/config";
 import { isJsonObject, parseClientJson } from "./json";
@@ -64,7 +65,10 @@ if (!isControllerMode(requested)) throw new Error("TOWERAI_CONTROLLER must be ba
 // Paid mode exists only if it was asked for at startup; a later request cannot create it.
 const createAgent = requested === "elevenlabs" ? towerFromEnv() : undefined;
 const controller = requested === "elevenlabs" && !createAgent ? "baseline" : requested;
-if (controller !== requested) console.warn("No ElevenLabs key: starting with the rules controller (labelled rules).");
+const hasKey = !!env.ELEVENLABS_API_KEY?.trim();
+const SETUP = "node --env-file=.env --import tsx packages/server/src/agents/setup.ts";
+const missing = hasKey ? `No tower agent (create it with: ${SETUP})` : "No ELEVENLABS_API_KEY";
+if (controller !== requested) console.warn(`${missing}: starting with the rules controller (labelled rules).`);
 const host = new SimHost({
   scenarioId: env.TOWERAI_SCENARIO ?? JUDGE_DEMO.id,
   controller,
@@ -77,6 +81,8 @@ const host = new SimHost({
 
 // Live speech exists only if it was asked for at startup, like paid control.
 const talkApi = env.TOWERAI_TALK === "on" ? ElevenLabs.fromEnv() : null;
+if (env.TOWERAI_TALK === "on" && !talkApi) console.warn("No ELEVENLABS_API_KEY: the cockpit takes typed input only.");
+if (talkApi && !cockpitAgent()) console.warn(`No cockpit agent, so the cockpit understands by rules only. Create it with: ${SETUP}`);
 const cockpit = createCockpit({ api: talkApi });
 let stopMeter: (() => void) | undefined;
 
@@ -185,7 +191,7 @@ function control(body: Record<string, unknown>) {
       break;
     case "controller":
       if (!isControllerMode(body.mode)) throw new HttpError(400, "mode must be baseline, elevenlabs or none.");
-      if (body.mode === "elevenlabs" && !createAgent) throw new HttpError(400, "Set ELEVENLABS_API_KEY and run npm run judge:live first.");
+      if (body.mode === "elevenlabs" && !createAgent) throw new HttpError(400, "The tower agent was not enabled at startup: it needs a key, the agents from agents/setup.ts, and npm run judge:live.");
       host.setController(body.mode);
       break;
     case "reset": {

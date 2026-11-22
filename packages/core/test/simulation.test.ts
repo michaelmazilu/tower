@@ -287,6 +287,17 @@ describe("emergencies", () => {
     expect(sim.stats).toMatchObject({ departed: 1, arrived: 1 });
   });
 
+  it("alerts on an incursion even when nobody holds the runway", () => {
+    const sim = sandbox([departure]);
+    expect(sim.dispatch({ type: "emergency.trigger", emergencyType: "runway_incursion", aircraftId: "WJA302" }).ok).toBe(true);
+    for (let i = 0; i < 180 / sim.config.dt && !sim.runwayState.get("05/23")!.occupants.length; i++) sim.step();
+    for (let i = 0; i < 2 / sim.config.dt; i++) sim.step();
+    const runway = sim.runwayState.get("05/23")!;
+    expect(runway.occupants).toEqual(["WJA302"]);
+    expect(runway.reservation).toBeUndefined();
+    expect([...sim.conflicts.values()].map((c) => c.type)).toContain("runway_incursion");
+  });
+
   it("goes around and recovers after an incursion below 100 feet", () => {
     const sim = sandbox([arrival, departure]);
     const { run } = withBaseline(sim);

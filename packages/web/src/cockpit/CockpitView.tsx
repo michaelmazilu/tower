@@ -74,7 +74,7 @@ export default function CockpitView() {
       <section className="ck-tower">
         <Latency last={last} thinking={phase === "thinking"} />
         <Check last={last} thinking={phase === "thinking"} />
-        <Conversation exchanges={exchanges} thinking={phase === "thinking"} sent={pilot.sent} />
+        <Conversation canTalk={pilot.canTalk} exchanges={exchanges} thinking={phase === "thinking"} sent={pilot.sent} />
         <footer className="ck-presenter">
           <small>presenter</small>
           {FAULTS.map(([fault, label]) => {
@@ -118,7 +118,7 @@ function Radio({ pilot, state }: { pilot: ReturnType<typeof useCockpit>; state: 
   const [title, line] =
     phase === "listening" ? ["listening", "let go when done"]
     : phase === "thinking" ? ["thinking", "reading your aircraft"]
-    : phase === "speaking" ? ["tower speaking", "press to interrupt"]
+    : phase === "speaking" ? ["tower speaking", canTalk ? "press to interrupt" : "type to interrupt"]
     : mic === "asking" ? ["allow mic", "in the browser prompt"]
     : !canTalk ? ["type instead", "speech is not available"]
     : mic === "blocked" ? ["allow mic", "or type instead"]
@@ -173,7 +173,7 @@ function Radio({ pilot, state }: { pilot: ReturnType<typeof useCockpit>; state: 
           <button disabled={!text.trim()}>send</button>
         </form>
         <p className={note ? "ck-note ck-red" : "ck-note"}>
-          {note || "Your voice is sent to ElevenLabs to transcribe and is not stored by TowerAI."}
+          {note || (canTalk ? "Your voice is sent to ElevenLabs to transcribe and is not stored by TowerAI." : "Typed input. Nothing is sent to ElevenLabs.")}
         </p>
       </div>
     </div>
@@ -247,7 +247,7 @@ function Check({ last, thinking }: { last?: Exchange; thinking: boolean }) {
   );
 }
 
-function Conversation({ exchanges, thinking, sent }: { exchanges: Exchange[]; thinking: boolean; sent: string | null }) {
+function Conversation({ canTalk, exchanges, thinking, sent }: { canTalk: boolean; exchanges: Exchange[]; thinking: boolean; sent: string | null }) {
   const list = useRef<HTMLOListElement>(null);
   const newest = exchanges.at(-1)?.id;
   useEffect(() => {
@@ -259,13 +259,13 @@ function Conversation({ exchanges, thinking, sent }: { exchanges: Exchange[]; th
     <ol className="ck-talk" ref={list}>
       {!exchanges.length && !thinking && <li className="ck-empty">
           <b>No experience needed.</b>
-          <p><i>1</i>Hold space and talk normally.</p>
+          <p><i>1</i>{canTalk ? "Hold space and talk normally." : "Type, or press a suggestion."}</p>
           <p><i>2</i>The tower tells you what to do.</p>
           <p><i>3</i>Read it back. Your plane moves.</p>
         </li>}
       {exchanges.map((x) => (
         <li key={x.id}>
-          <p className="ck-heard"><small>you{x.input === "typed" && ", typed"}</small>{x.heard}</p>
+          {x.heard && <p className="ck-heard"><small>you{x.input === "typed" && ", typed"}</small>{x.heard}</p>}
           <p className="ck-said"><small>tower</small>{x.said}</p>
           <p className="ck-why">
             <em>{x.brain}</em>
