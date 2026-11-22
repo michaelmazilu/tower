@@ -21,10 +21,16 @@ interface Turn {
   output?: { text: string }[];
 }
 
-/** One text conversation per attached tower. All tool execution stays on the simulation host. */
-export class ElevenLabsTower implements TowerAgent {
-  private conversationId?: string;
+const accepted = (r: ToolResult) =>
+  r.ok && r.tool === "issue_clearance" && (r.result as { status?: unknown }).status === "accepted";
 
+/**
+ * One text conversation per review. Each briefing is a full snapshot, so earlier
+ * reviews add nothing but length: reusing one conversation grew every prompt by
+ * about 6 KB a review and slowed each call as the demo went on.
+ * All tool execution stays on the simulation host.
+ */
+export class ElevenLabsTower implements TowerAgent {
   constructor(
     private readonly agentId: string,
     private readonly apiKey: string,
@@ -46,16 +52,13 @@ export class ElevenLabsTower implements TowerAgent {
 
   async review(context: TurnContext): Promise<string> {
     const { signal } = context;
-    try {
-      await this.account?.prepare();
-      if (!this.conversationId) {
-        const created = await this.post<{ conversation_id: string }>("", {
-          agent: { type: "persisted", agent_id: this.agentId },
-        }, signal);
-        if (!created.conversation_id) throw new Error("ElevenLabs omitted the conversation ID.");
-        this.conversationId = created.conversation_id;
-      }
-      const path = "/" + encodeURIComponent(this.conversationId) + "/messages";
+    await this.account?.prepare();
+    const created = await this.post<{ conversation_id: string }>("", {
+      agent: { type: "persisted", agent_id: this.agentId },
+    }, signal);
+    if (!created.conversation_id) throw new Error("ElevenLabs omitted the conversation ID.");
+    {
+      const path = "/" + encodeURIComponent(created.conversation_id) + "/messages";
       let input: unknown[] = [{
         type: "user_message",
         content: [{ type: "text", text: JSON.stringify(context.briefing) }],
@@ -71,6 +74,7 @@ export class ElevenLabsTower implements TowerAgent {
           throw new Error(`ElevenLabs turn ended with status ${turn.status}.`);
         }
         if (round >= 24) throw new Error("Tower exceeded the round limit for one review.");
+        const fresh: string[] = [];
         input = turn.required_actions.map((action) => {
           const { tool_call_id: id, tool_name: tool, parameters } = action;
           if (!id || typeof tool !== "string" || !parameters || typeof parameters !== "object" || Array.isArray(parameters)) {
@@ -81,14 +85,18 @@ export class ElevenLabsTower implements TowerAgent {
             if (calls.size >= 48) throw new Error("Tower exceeded the tool budget for one review.");
             result = context.call(tool.startsWith(TOOL_PREFIX) ? tool.slice(TOOL_PREFIX.length) : tool, parameters);
             calls.set(id, result);
+            fresh.push(id);
           }
           return { type: "client_tool_result", tool_call_id: id, is_error: !result.ok, result: JSON.stringify(result) };
         });
+        // Accepted clearances are already queued for the radio. Sending the results back
+        // would only buy a summary, one more model round that keeps the next review waiting.
+        // The conversation is thrown away, so nothing is left pending. Rejections still go back.
+        const issued = fresh.map((id) => calls.get(id)!);
+        if (issued.length && issued.every(accepted)) {
+          return `Issued ${issued.length} clearance${issued.length === 1 ? "" : "s"}; review ended without a summary round.`;
+        }
       }
-    } catch (error) {
-      // A lost response may have left pending actions remotely. Start with fresh world state.
-      this.conversationId = undefined;
-      throw error;
     }
   }
 }

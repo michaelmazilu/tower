@@ -35,6 +35,8 @@ export interface PilotOptions {
   /** Defaults to the flights the scenario marks as AI pilots. */
   flights?: "all" | string[];
   onTurn?: (turn: PilotTurn) => void;
+  /** Also ask the AI when the pilot has only one valid reply. Off: it costs credits and time for no choice. */
+  askOnRoutine?: boolean;
   api?: ElevenLabs | null;
   ids?: AgentIds | null;
 }
@@ -68,7 +70,7 @@ export function attachPilots(sim: Simulation, options: PilotOptions = {}): Pilot
   if (!maybeApi || !maybeIds) return OFF;
   const api = maybeApi;
   const ids = maybeIds;
-  const { maxCalls = 12, timeoutMs = 4000, flights, onTurn } = options;
+  const { maxCalls = 12, timeoutMs = 4000, flights, onTurn, askOnRoutine = false } = options;
   // Always this sim, never "the host's current one": a late reply must not land in a restarted run.
   const dispatch = (command: Command) => sim.dispatch(command);
 
@@ -248,9 +250,17 @@ export function attachPilots(sim: Simulation, options: PilotOptions = {}): Pilot
     const running: Promise<void>[] = [];
     for (const task of tasks) {
       const instant = "clearance" in task && INSTANT.has(task.clearance.type);
+      // With nothing wrong the pilot has one valid reply. An AI call would cost credits
+      // and about 1.3 s to pick it, so the rules say it at once and the budget waits
+      // for turns with a real choice (read back, or ask for a person).
+      const routine = !instant && !askOnRoutine && promptFor(task).options.length === 1;
       const slot = busy.size < CONCURRENT && calls < maxCalls;
       const since = waitingSince.get(task.key) ?? sim.time;
-      if (!instant && slot) {
+      if (routine) {
+        waitingSince.delete(task.key);
+        done.set(task.key, sim.time);
+        say(task, "rules", "Routine reply with only one valid option, so no AI call.", []);
+      } else if (!instant && slot) {
         waitingSince.delete(task.key);
         running.push(take(task));
       } else if (instant || calls >= maxCalls || sim.time - since > MAX_WAIT_S) {

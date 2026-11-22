@@ -3,7 +3,8 @@ import {
 } from "@towerai/core";
 
 export interface TurnContext {
-  briefing: { turnId: string; triggers: SimEvent[]; airport: ToolResult };
+  /** Everything a review normally reads, sent up front so the first model call can act. */
+  briefing: { turnId: string; triggers: SimEvent[]; airport: ToolResult; runways?: ToolResult };
   signal: AbortSignal;
   call(tool: string, args: Record<string, unknown>): ToolResult;
 }
@@ -65,7 +66,9 @@ export class AtcController {
     try {
       this.sim.annotate("controller.review_started", { turnId, triggerSeqs: triggers.map((e) => e.seq) });
       const airport = call("get_airport_state", {});
-      const summary = await this.agent.review({ briefing: { turnId, triggers, airport }, call, signal: active.signal });
+      // The prompt used to make the model fetch runway status itself, costing a full model round.
+      const runways = call("get_runway_status", {});
+      const summary = await this.agent.review({ briefing: { turnId, triggers, airport, runways }, call, signal: active.signal });
       active.signal.throwIfAborted();
       this.sim.annotate("controller.review_completed", { turnId, summary });
       this.failures = 0;

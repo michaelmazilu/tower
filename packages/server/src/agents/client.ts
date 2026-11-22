@@ -32,6 +32,11 @@ export class CreditGuard {
     this.cap = Number.isFinite(cap) ? Math.min(HARD_CAP, cap) : DEFAULT_CAP;
   }
 
+  /** True once a meter read has succeeded and no later read has failed. */
+  get checked(): boolean {
+    return this.remote !== undefined;
+  }
+
   /** Call before every batch. A batch cannot spend until this has succeeded. */
   async refresh(): Promise<Usage> {
     this.lastReadAt = Date.now();
@@ -101,10 +106,19 @@ export class ElevenLabs {
   /**
    * One meter read per batch, where a batch is at most a minute. The meter is
    * rate limited, and between reads the local estimate carries the cap.
+   *
+   * Only the first read is waited for. Later reads run in the background, so a
+   * decision never stalls on the meter (it can take seconds): until the new
+   * reading lands, the last reading plus the local estimate, which only grows,
+   * still enforce the cap. A failed read still blocks spending, as before.
    */
   async prepare(): Promise<void> {
-    if (Date.now() - this.guard.lastReadAt >= 60_000) this.batch = this.guard.refresh();
-    await this.batch;
+    if (Date.now() - this.guard.lastReadAt >= 60_000) {
+      this.batch = this.guard.refresh();
+      // Background reads report failure through `guard.checked`, not as an unhandled rejection.
+      this.batch.catch(() => undefined);
+    }
+    if (!this.guard.checked) await this.batch;
   }
 
   fetch(method: string, path: string, body: unknown, signal: AbortSignal): Promise<Response> {

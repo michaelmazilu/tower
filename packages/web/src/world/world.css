@@ -397,3 +397,25 @@
 .wv-hear b { font-size: 16px; }
 .wv-stage { position: relative; }
 .wv .wv-hear.over { position: absolute; z-index: 3; top: 12px; left: 12px; height: 56px; padding: 0 20px; }
+
+/* A clicked background flight. Small on purpose: it has no story to tell. */
+.wv-bgcard {
+  position: absolute;
+  /* Below the recentre key, away from the dense left side where the clicked dot usually is. */
+  top: 52px;
+  right: 12px;
+  width: 260px;
+  max-width: calc(100% - 24px);
+  padding: 10px 12px;
+  background: var(--black);
+  border: 1px solid var(--grey-600);
+  color: var(--grey-200);
+  font-size: 12px;
+}
+.wv-bgcard-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.wv-bgcard-head b { color: var(--white); font-family: var(--mono); }
+.wv-bgcard-head span { color: var(--grey-400); flex: 1; }
+.wv-bgcard dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 8px; font-family: var(--mono); }
+.wv-bgcard dt { color: var(--grey-400); }
+.wv-bgcard dd { margin: 0; }
+.wv-bgcard p { margin: 0; color: var(--grey-400); }

@@ -136,13 +136,14 @@ describe("tower intelligence integration", () => {
 });
 
 describe("ElevenLabs text tool protocol", () => {
-  it("creates an agent conversation, answers repeated tool calls once and returns the actual rejection to the model", async () => {
+  it("creates a conversation per review, answers repeated tool calls once and returns the actual rejection to the model", async () => {
     const action = { type: "client_tool_call", tool_call_id: "call-1", tool_name: "issue_clearance", parameters: { runway: "23" } };
     const replies = [
       { conversation_id: "conv-1" },
       { status: "requires_action", required_actions: [action] },
       { status: "requires_action", required_actions: [action] },
       { status: "completed", output: [{ text: "Waiting for the arrival." }] },
+      { conversation_id: "conv-2" },
       { status: "completed", output: [{ text: "Traffic reviewed." }] },
     ];
     const posted: { url: string; body: Record<string, unknown> }[] = [];
@@ -159,7 +160,28 @@ describe("ElevenLabs text tool protocol", () => {
     expect(await agent.review(context)).toBe("Traffic reviewed.");
     expect(context.call).toHaveBeenCalledTimes(1);
     expect(posted[0].body).toEqual({ agent: { type: "persisted", agent_id: "tower-1" } });
-    expect(posted.slice(1).every((p) => p.url.endsWith("/conv-1/messages"))).toBe(true);
+    expect(posted.slice(1, 4).every((p) => p.url.endsWith("/conv-1/messages"))).toBe(true);
     expect(posted[2].body.input).toEqual([{ type: "client_tool_result", tool_call_id: "call-1", is_error: false, result: JSON.stringify(rejection) }]);
+    // The second review starts clean instead of carrying the first one's briefing.
+    expect(posted[4].body).toEqual({ agent: { type: "persisted", agent_id: "tower-1" } });
+    expect(posted[5].url.endsWith("/conv-2/messages")).toBe(true);
+  });
+
+  it("ends a review once every clearance in a round is accepted, without a summary round", async () => {
+    const action = { type: "client_tool_call", tool_call_id: "call-1", tool_name: "issue_clearance", parameters: { runway: "23" } };
+    const replies = [{ conversation_id: "conv-1" }, { status: "requires_action", required_actions: [action] }];
+    const posted: string[] = [];
+    const agent = new ElevenLabsTower("tower-1", "test-key", async (url) => {
+      posted.push(String(url));
+      return Response.json(replies.shift());
+    });
+    const accepted: ToolResult = { ok: true, tool: "issue_clearance", result: { status: "accepted" } };
+    const context = {
+      briefing: { turnId: "ATC-1", triggers: [], airport: { ok: true, tool: "get_airport_state", result: {} } as ToolResult },
+      call: vi.fn(() => accepted), signal: new AbortController().signal,
+    };
+    expect(await agent.review(context)).toMatch(/^Issued 1 clearance/);
+    expect(context.call).toHaveBeenCalledTimes(1);
+    expect(posted).toHaveLength(2);
   });
 });
