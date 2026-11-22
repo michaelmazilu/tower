@@ -137,6 +137,32 @@ describe("live operations", () => {
     for (const id of ["WJA302", "ACA214"]) expect(JSON.stringify(brief(id))).not.toMatch(/reserved|05\/23|NM/);
   });
 
+  it("never says a departure turning back aborted a landing", () => {
+    const host = demo();
+    let context: string | undefined;
+    for (let i = 0; i < 160 && !context; i++) {
+      host.stepOnce(10);
+      const ac = host.sim.get("UAL119");
+      if (ac?.flags.emergencyReturn && ac.phase === "go_around") context = host.opsState().flights.find((f) => f.id === "UAL119")?.brief?.context;
+    }
+    expect(context).toMatch(/Turning back to land/);
+  });
+
+  it("does not swap the arrival and the aircraft in its way", () => {
+    const host = demo();
+    host.stepOnce(10);
+    const arrival = host.sim.get("DAL482")!;
+    const blocker = host.sim.get("UAL119")!;
+    host.sim.conflicts.clear();
+    host.sim.conflicts.set("test", {
+      key: "test", type: "arrival_runway_occupied", severity: "critical", detectedAt: host.sim.time,
+      aircraftIds: [arrival.id, blocker.id], runwayId: "06L/24R", description: "test",
+    });
+    const card = (host.ops as any).runwayConflict(blocker, 1, 1);
+    expect(card.context).toMatch(/^DAL482 is coming in to land/);
+    expect((host.ops as any).runwayConflict(arrival, 1, 1).context).toMatch(/^UAL119 is on runway/);
+  });
+
   it("warns before handback when help the agent will not call has not been called", () => {
     const host = demo();
     host.stepOnce(450);

@@ -140,7 +140,7 @@ export function NeedsYou({ flight, operator, heldAlerts, messages }: {
         </div>
       )}
 
-      {result && !result.ok && <p className="ask-refused" role="status">Not sent: {result.text}</p>}
+      {result && <p className={result.ok ? "ask-sofar" : "ask-refused"} role="status">{result.ok ? "" : "Not sent: "}{result.text}</p>}
 
       {held && (
         <div className="ask-back">

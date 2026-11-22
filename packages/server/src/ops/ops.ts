@@ -398,6 +398,15 @@ export class Ops {
           : "It needs to stop, then get off the runway.",
       };
     }
+    // An arrival conflict lists the arrival first; an incursion lists whoever is in the way first.
+    const inTheWay = c?.type === "arrival_runway_occupied" ? c.aircraftIds[0] !== ac.id : c?.aircraftIds[0] === ac.id;
+    if (inTheWay) {
+      const o = other ? sim.get(other) : undefined;
+      return {
+        problem: `In the way on runway ${rw}`,
+        context: o && o.altitudeFt > 0 ? `${name(other)} is coming in to land on that runway.` : `${name(other)} needs that runway.`,
+      };
+    }
     return {
       problem: "Its runway is blocked",
       context:
@@ -436,6 +445,8 @@ export class Ops {
       ? runway.context
       : ac.phase === "approach" || ac.phase === "landing"
         ? `Landing on runway ${ac.assignedRunway}, ${miles} miles out, about ${minutes} min from touchdown.`
+        : ac.phase === "go_around" && ac.flags.emergencyReturn
+          ? `Turning back to land on runway ${ac.assignedRunway}.`
         : ac.phase === "go_around"
           ? `Aborted its landing and is coming back around for runway ${ac.assignedRunway}.`
           : ac.phase === "holding"
