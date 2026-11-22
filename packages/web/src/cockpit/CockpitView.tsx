@@ -1,19 +1,23 @@
-import { useEffect, useRef, useState } from "react";
-import type { CockpitState, Exchange, Fault } from "@towerai/contracts";
+import { useEffect, useState } from "react";
+import type { CockpitState, Exchange, Fault, Stage } from "@towerai/contracts";
 import type { AirportData } from "@towerai/core";
 import { get } from "../ops/useOps";
-import { Windscreen } from "./Windscreen";
+import { Flight3D } from "./Flight3D";
 import { useCockpit } from "./useCockpit";
 import "./cockpit.css";
 
+type Pilot = ReturnType<typeof useCockpit>;
+
 const FAULTS: [Fault, string][] = [["engine_failure", "engine failure"], ["smoke", "smoke"], ["low_fuel", "low fuel"]];
 const VERDICT = { confirmed: "The data confirms it", contradicted: "The data says otherwise", unverified: "The data can't verify it" };
+const STAGES: [Stage, string][] = [["check_in", "check in"], ["pushback", "push back"], ["taxi", "taxi"], ["cross", "cross"], ["takeoff", "take off"], ["climb", "climb"]];
 const LOW_FUEL_MIN = 30;
 const WEAK_ENGINE_PCT = 15;
 
 const red = (on: boolean) => (on ? "ck-red" : undefined);
 const seconds = (ms: number) => (ms < 10 ? "<0.01" : (ms / 1000).toFixed(2));
 
+/** The aircraft fills the screen. Over it: where you are, what the tower said, and the one thing to say next. */
 export default function CockpitView() {
   const pilot = useCockpit();
   const { state, exchanges, phase } = pilot;
@@ -35,83 +39,69 @@ export default function CockpitView() {
   }, []);
 
   if (!state) return <p className="wait">{pilot.lost ? "The pilot's seat is not answering. Trying again." : "loading"}</p>;
-  const last = exchanges.at(-1);
 
   return (
     <div className="ck">
-      <section className="ck-seat">
-        <header className={state.humanCalled ? "ck-who ck-alarm" : "ck-who"}>
-          <div className="ck-you">
-            <small>you are the pilot of</small>
-            <b>{state.callsign}</b>
-            <span>{state.spokenCallsign}, {state.type}</span>
-          </div>
-          <div className="ck-now">
-            <small>
-              {state.humanCalled && <strong>responders alerted</strong>}
-              {state.status}
-            </small>
-            <p>{state.coach.now}</p>
-          </div>
-        </header>
-
-        <div className="ck-window">
-          {airport && <Windscreen airport={airport} state={state} />}
-          {pilot.lost && <p className="ck-lost">Link to the tower lost. Reconnecting.</p>}
-          {airport?.attribution && <small className="ck-credit">schematic view {airport.attribution}</small>}
-          {state.readBack && phase !== "thinking" && (
-            <div className="ck-readback" data-long={state.readBack.length > 70 || undefined}>
-              <small>your turn: {pilot.canTalk ? "hold space and read this back" : "type this back"}</small>
-              <p>{state.readBack}</p>
-            </div>
-          )}
-        </div>
-
-        <Instruments state={state} />
-        <Radio pilot={pilot} state={state} />
-      </section>
-
-      <section className="ck-tower">
-        <Latency last={last} thinking={phase === "thinking"} />
-        <Check last={last} thinking={phase === "thinking"} />
-        <Conversation canTalk={pilot.canTalk} exchanges={exchanges} thinking={phase === "thinking"} sent={pilot.sent} />
-        <footer className="ck-presenter">
-          <small>presenter</small>
-          {FAULTS.map(([fault, label]) => {
-            const on = state.faults.includes(fault);
-            return (
-              <button key={fault} aria-pressed={on} onClick={() => void pilot.command("/api/cockpit/fault", { fault, on: !on })}>
-                {label}
-              </button>
-            );
-          })}
-          <button className="ck-reset" onClick={() => void pilot.command("/api/cockpit/reset")}>reset</button>
-        </footer>
-      </section>
+      <div className="ck-world">{airport && <Flight3D airport={airport} state={state} />}</div>
+      <Progress state={state} />
+      <div className="ck-over">
+        <Situation state={state} />
+        <Tower last={exchanges.at(-1)} thinking={phase === "thinking"} sent={pilot.sent} />
+      </div>
+      {pilot.lost && <p className="ck-lost">Link to the tower lost. Reconnecting.</p>}
+      <Dock pilot={pilot} state={state} />
+      <Foot pilot={pilot} state={state} attribution={airport?.attribution} />
     </div>
   );
 }
 
-function Instruments({ state: { vitals: v } }: { state: CockpitState }) {
+function Progress({ state }: { state: CockpitState }) {
+  const at = STAGES.findIndex(([stage]) => stage === state.stage);
+  return (
+    <header className="ck-top">
+      <p className={state.humanCalled ? "ck-id ck-red" : "ck-id"}>
+        <b>{state.callsign}</b>
+        <span>you are the pilot</span>
+      </p>
+      <ol className="ck-steps">
+        {STAGES.map(([stage, name], i) => (
+          <li key={stage} data-step={i < at ? "done" : i === at ? "now" : "next"} aria-current={i === at ? "step" : undefined}>
+            <i>{i + 1}</i>
+            {name}
+          </li>
+        ))}
+      </ol>
+      <p className="ck-time" data-fast={state.speed > 1 || undefined}>
+        <b>{state.speed}&times;</b>
+        {state.speed > 1 ? "sped up" : "real time"}
+      </p>
+    </header>
+  );
+}
+
+function Situation({ state }: { state: CockpitState }) {
+  const v = state.vitals;
   const [left, right] = v.engines;
   // Both off at the stand is normal. One down, or any down in the air, is not.
   const failed = (pct: number, other: number) => pct < WEAK_ENGINE_PCT && (!v.onGround || other >= WEAK_ENGINE_PCT);
   return (
-    <dl className="ck-dials">
-      <Dial label="altitude" value={Math.max(0, Math.round(v.altFt)).toLocaleString("en")} unit="ft" />
-      <Dial label="speed" value={String(Math.round(v.gsKt))} unit="kt" />
-      <Dial label="climb" value={`${v.vsFpm > 0 ? "+" : ""}${Math.round(v.vsFpm)}`} unit="fpm" />
-      <Dial label="left engine" value={String(Math.round(left))} unit="%" fill={left} alert={failed(left, right)} />
-      <Dial label="right engine" value={String(Math.round(right))} unit="%" fill={right} alert={failed(right, left)} />
-      <Dial label="fuel" value={String(Math.round(v.fuelMin))} unit="min" alert={v.fuelMin < LOW_FUEL_MIN} />
-      <Dial label="smoke" value={v.smoke ? "YES" : "none"} alert={v.smoke} />
-      <Dial label="gear" value={v.gearDown ? "down" : "up"} />
-    </dl>
+    <section className="ck-where">
+      <small>
+        {state.humanCalled && <strong>responders alerted</strong>}
+        {state.status}
+      </small>
+      <p>{state.coach.now}</p>
+      <dl>
+        <Reading label="altitude" value={Math.max(0, Math.round(v.altFt)).toLocaleString("en")} unit="ft" />
+        <Reading label="speed" value={String(Math.round(v.gsKt))} unit="kt" />
+        <Reading label="engines" value={`${Math.round(left)} / ${Math.round(right)}`} unit="%" alert={failed(left, right) || failed(right, left)} />
+        {v.smoke ? <Reading label="smoke" value="YES" alert /> : <Reading label="fuel" value={String(Math.round(v.fuelMin))} unit="min" alert={v.fuelMin < LOW_FUEL_MIN} />}
+      </dl>
+    </section>
   );
 }
 
-/** `fill` is a percentage, for the readings that have one. */
-function Dial({ label, value, unit, fill, alert = false }: { label: string; value: string; unit?: string; fill?: number; alert?: boolean }) {
+function Reading({ label, value, unit, alert = false }: { label: string; value: string; unit?: string; alert?: boolean }) {
   return (
     <div className={red(alert)}>
       <dt>{label}</dt>
@@ -119,27 +109,94 @@ function Dial({ label, value, unit, fill, alert = false }: { label: string; valu
         {value}
         {unit && <i>{unit}</i>}
       </dd>
-      {fill !== undefined && <dd className="ck-gauge" aria-hidden="true"><s style={{ width: `${Math.min(100, Math.max(0, fill))}%` }} /></dd>}
     </div>
   );
 }
 
-function Radio({ pilot, state }: { pilot: ReturnType<typeof useCockpit>; state: CockpitState }) {
-  const { mic, phase, note, canTalk, press, release, say } = pilot;
-  const [text, setText] = useState("");
-  const typeOnly = !canTalk || mic === "blocked";
+/** Only the latest exchange. Nothing is here until someone has spoken. */
+function Tower({ last, thinking, sent }: { last?: Exchange; thinking: boolean; sent: string | null }) {
+  if (thinking) {
+    return (
+      <section className="ck-tower" aria-live="polite">
+        {sent && <p className="ck-heard"><small>you said</small>{sent}</p>}
+        <p className="ck-said"><small>tower</small>Checking your aircraft...</p>
+      </section>
+    );
+  }
+  if (!last) return null;
+  const t = last.timings;
+  const parts = [
+    ["hear", t.transcribeMs],
+    ["think", t.decide.ms],
+    // A phrase said before comes from the cache. That is not how fast the voice is made.
+    [t.voice?.source.startsWith("cached") ? "speak, cached" : "speak", t.voice?.ms],
+  ] as const;
+  const { check, action } = last;
+  return (
+    <section className="ck-tower" aria-live="polite" data-check={!!check || undefined} key={last.id}>
+      {last.heard && <p className="ck-heard"><small>you said</small>{last.heard}</p>}
+      <p className="ck-said" data-long={!!check || last.said.length > 130 || undefined}><small>tower</small>{last.said}</p>
+      {check && (
+        <div className="ck-check" data-verdict={check.verdict}>
+          <p>
+            <b>{VERDICT[check.verdict]}</b>
+            <small>{check.evidence.filter((row) => row.agrees).length} of {check.evidence.length} readings match &ldquo;{check.claim}&rdquo;</small>
+          </p>
+          <ul>
+            {check.evidence.map((row, i) => (
+              <li key={i} data-agrees={row.agrees}>
+                <span>{row.label}</span>
+                <b>{row.value}</b>
+                <em>{row.agrees ? "matches" : "differs"}</em>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="ck-proof">
+        <p>
+          <em>{last.brain}</em>
+          {action && <em className={red(action.verdict === "rejected")}>{action.type.replaceAll("_", " ").toLowerCase()} {action.verdict}</em>}
+          <span>{last.reason}</span>
+        </p>
+        <dl>
+          <div className="ck-total">
+            <dt>answered in</dt>
+            <dd>{seconds(t.totalMs)}<i>s</i></dd>
+          </div>
+          {parts.map(([name, ms]) => ms !== undefined && (
+            <div key={name}>
+              <dt>{name}</dt>
+              <dd>{Math.round(ms)}<i>ms</i></dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
+}
 
-  const [title, line] =
-    phase === "listening" ? ["listening", "let go when done"]
-    : phase === "thinking" ? ["thinking", "reading your aircraft"]
-    : phase === "speaking" ? ["speaking", canTalk ? "press to interrupt" : "type to interrupt"]
+/** The talk key and the one thing to say next, big enough to read aloud from. */
+function Dock({ pilot, state }: { pilot: Pilot; state: CockpitState }) {
+  const { mic, phase, canTalk, press, release } = pilot;
+  const [title, hint] =
+    !canTalk ? ["voice is off", "start with npm run judge:talk"]
+    : phase === "listening" ? ["listening", "let go when done"]
+    : phase === "thinking" ? ["thinking", "checking your aircraft"]
+    : phase === "speaking" ? ["speaking", "hold space to interrupt"]
     : mic === "asking" ? ["allow mic", "in the browser prompt"]
-    : !canTalk ? ["type instead", "speech is not available"]
-    : mic === "blocked" ? ["allow mic", "or type instead"]
-    : ["hold to talk", mic === "ready" ? "mic ready. space, or hold here" : "space. first press asks for the mic"];
+    : mic === "blocked" ? ["mic blocked", "allow it in the address bar"]
+    : ["hold space", "and speak"];
+  const [first, ...more] = state.coach.trySaying;
+  const words = state.waiting ? (state.readBack ?? first) : undefined;
+  const label =
+    phase === "listening" ? "listening: say it, then let go of space"
+    : state.readBack ? "hold space and read it back out loud"
+    : "hold space and say it out loud";
+  const also = words ? more.slice(0, 1) : state.coach.trySaying.slice(0, 2);
 
   return (
-    <div className="ck-radio">
+    <div className="ck-dock">
       <button
         className="ck-key"
         data-phase={phase}
@@ -156,156 +213,81 @@ function Radio({ pilot, state }: { pilot: ReturnType<typeof useCockpit>; state: 
         onLostPointerCapture={release}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <span className="ck-wave" aria-hidden="true">{Array.from({ length: 11 }, (_, i) => <i key={i} />)}</span>
+        <span className="ck-wave" aria-hidden="true">{Array.from({ length: 9 }, (_, i) => <i key={i} />)}</span>
         <b>{title}</b>
-        <span className="ck-hint" aria-live="polite">{line}</span>
+        <span className="ck-hint" aria-live="polite">{hint}</span>
       </button>
-      <div className="ck-say">
-        <div className="ck-try">
-          <small>{typeOnly ? "press one, or type" : "try saying"}</small>
-          {state.coach.trySaying.slice(0, 3).map((words) => (
-            <button key={words} title={words} onClick={() => say(words)}>&ldquo;{words}&rdquo;</button>
+      {/* Words to read aloud. Pressing them does nothing: the tower answers to a voice. */}
+      {words && phase !== "thinking" ? (
+        <p className="ck-cue" data-listening={phase === "listening" || undefined} data-long={words.length > 40 || undefined}>
+          <small>{label}</small>
+          <b>&ldquo;{words}&rdquo;</b>
+        </p>
+      ) : (
+        <p className="ck-helps">
+          <small>what TowerAI is doing</small>
+          {phase === "thinking" ? "Checking what you said against your aircraft." : state.helps}
+        </p>
+      )}
+      {also.length > 0 && (
+        <div className="ck-alts">
+          {also.map((line, i) => (
+            <p className="ck-also" key={line}>
+              {i === 0 && <small>or say</small>}
+              <span>&ldquo;{line}&rdquo;</span>
+            </p>
           ))}
         </div>
-        <form
-          className="ck-type"
-          onSubmit={(e) => {
-            e.preventDefault();
-            say(text);
-            setText("");
-            // Give space back to the talk key.
-            if (!typeOnly) (document.activeElement as HTMLElement | null)?.blur();
-          }}
-        >
-          <input
-            value={text}
-            maxLength={300}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && e.currentTarget.blur()}
-            placeholder={typeOnly ? "Type to the tower, in your own words" : "or type to the tower"}
-            aria-label="Type to the tower"
-          />
-          <button disabled={!text.trim()}>send</button>
-        </form>
-        <p className={note ? "ck-note ck-red" : "ck-note"}>
-          {note || (canTalk ? "Your voice is sent to ElevenLabs to transcribe and is not stored by TowerAI." : "Typed input. Nothing is sent to ElevenLabs.")}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function Latency({ last, thinking }: { last?: Exchange; thinking: boolean }) {
-  const t = thinking ? undefined : last?.timings;
-  const parts = [
-    ["hear", t?.transcribeMs],
-    ["think", t?.decide.ms, t?.decide.kind],
-    // A phrase said before comes from the cache. That is not how fast the voice is made.
-    [t?.voice?.source.startsWith("cached") ? "speak, cached" : "speak", t?.voice?.ms, t?.voice?.kind],
-  ] as const;
-  return (
-    <dl className="ck-latency">
-      <div className="ck-total">
-        <dt>{t ? "answered in" : thinking ? "answering" : "time to answer"}</dt>
-        <dd>{t ? seconds(t.totalMs) : thinking ? "..." : "-"}{t && <i>s</i>}</dd>
-      </div>
-      {parts.map(([name, ms, kind]) => (
-        <div key={name.split(",")[0]}>
-          <dt>{name}{kind === "modelled" && ", modelled"}</dt>
-          <dd>{ms === undefined ? "-" : Math.round(ms)}{ms !== undefined && <i>ms</i>}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function Check({ last, thinking }: { last?: Exchange; thinking: boolean }) {
-  const check = thinking ? null : last?.check;
-  if (!check) {
-    const looked = thinking ? [] : (last?.looked ?? []);
-    return (
-      <div className="ck-check ck-check-idle">
-        <h2>{thinking ? "checking what you said against the aircraft" : looked.length ? "what the tower looked at on your last call" : "the tower checks what you say against the aircraft"}</h2>
-        {looked.length ? (
-          <ul>{looked.slice(0, 6).map((fact, i) => <li key={i}>{fact}</li>)}</ul>
-        ) : (
-          !thinking && <p>Say &ldquo;we&rsquo;re crashing!&rdquo; and see what it finds.</p>
-        )}
-      </div>
-    );
-  }
-  const agree = check.evidence.filter((row) => row.agrees).length;
-  return (
-    <div className={`ck-check ck-check-${check.verdict}`} key={last!.id}>
-      <div className="ck-finding">
-        <div className="ck-claim">
-          <small>you reported</small>
-          <p>{check.claim}</p>
-        </div>
-        <div className="ck-verdict">
-          <small>{agree} of {check.evidence.length} {check.evidence.length === 1 ? "reading matches" : "readings match"}</small>
-          <p>{VERDICT[check.verdict]}</p>
-          {last!.callsHuman && <span>responders alerted</span>}
-        </div>
-      </div>
-      <ul className="ck-evidence">
-        {check.evidence.map((row, i) => (
-          <li key={i} data-agrees={row.agrees}>
-            <small>{row.label}</small>
-            <b>{row.value}</b>
-            <em>{row.agrees ? "matches" : "differs"}</em>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Conversation({ canTalk, exchanges, thinking, sent }: { canTalk: boolean; exchanges: Exchange[]; thinking: boolean; sent: string | null }) {
-  const list = useRef<HTMLOListElement>(null);
-  const newest = exchanges.at(-1)?.id;
-  useEffect(() => {
-    const el = list.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [newest, exchanges.length, thinking, sent]);
-  useEffect(() => {
-    // The newest line stays in view when the check above it grows.
-    const el = list.current!;
-    const keep = new ResizeObserver(() => (el.scrollTop = el.scrollHeight));
-    keep.observe(el);
-    return () => keep.disconnect();
-  }, []);
-
-  return (
-    <ol className="ck-talk" ref={list}>
-      {!exchanges.length && !thinking && <li className="ck-empty">
-          <b>No experience needed.</b>
-          <p><i>1</i>{canTalk ? "Hold space and talk normally." : "Type, or press a suggestion."}</p>
-          <p><i>2</i>The tower tells you what to do.</p>
-          <p><i>3</i>Read it back. Your plane moves.</p>
-        </li>}
-      {exchanges.map((x) => (
-        <li key={x.id}>
-          {x.heard && <p className="ck-heard"><small>you{x.input === "typed" && ", typed"}</small>{x.heard}</p>}
-          <p className="ck-said"><small>tower</small>{x.said}</p>
-          <p className="ck-why">
-            <em>{x.brain}</em>
-            {x.action && (
-              <em className={red(x.action.verdict === "rejected")}>
-                {x.action.type.replaceAll("_", " ")} {x.action.verdict}
-                {x.action.blockedBy && `: ${x.action.blockedBy}`}
-              </em>
-            )}
-            <span>{x.reason}</span>
-          </p>
-        </li>
-      ))}
-      {thinking && (
-        <li>
-          {sent && <p className="ck-heard"><small>you, typed</small>{sent}</p>}
-          <p className="ck-said"><small>tower</small>...</p>
-        </li>
       )}
-    </ol>
+    </div>
+  );
+}
+
+function TypeLine({ pilot, placeholder }: { pilot: Pilot; placeholder: string }) {
+  const { canTalk, mic, say } = pilot;
+  const [text, setText] = useState("");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        say(text);
+        setText("");
+        // Give space back to the talk key.
+        if (canTalk && mic !== "blocked") (document.activeElement as HTMLElement | null)?.blur();
+      }}
+    >
+      <input
+        value={text}
+        maxLength={300}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && e.currentTarget.blur()}
+        placeholder={placeholder}
+        aria-label="Type to the tower"
+        autoFocus
+      />
+    </form>
+  );
+}
+
+function Foot({ pilot, state, attribution }: { pilot: Pilot; state: CockpitState; attribution?: string }) {
+  const { canTalk, note, command } = pilot;
+  const [typing, setTyping] = useState(false);
+  return (
+    <footer className="ck-foot">
+      {typing && <TypeLine pilot={pilot} placeholder="type to the tower, then return" />}
+      <p className={note ? "ck-note ck-red" : "ck-note"}>
+        {note || `${canTalk ? "Voice is transcribed by ElevenLabs, not stored by TowerAI." : "Voice is off in this copy. Nothing is sent to ElevenLabs."}${attribution ? ` Map ${attribution}` : ""}`}
+      </p>
+      <button aria-pressed={typing} onClick={() => setTyping(!typing)}>keyboard backup</button>
+      {FAULTS.map(([fault, label]) => {
+        const on = state.faults.includes(fault);
+        return (
+          <button key={fault} aria-pressed={on} onClick={() => void command("/api/cockpit/fault", { fault, on: !on })}>
+            {label}
+          </button>
+        );
+      })}
+      <button className="ck-reset" onClick={() => void command("/api/cockpit/reset")}>reset</button>
+    </footer>
   );
 }

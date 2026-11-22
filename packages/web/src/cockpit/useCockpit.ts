@@ -26,10 +26,13 @@ export function useCockpit() {
   const r = useRef({
     alive: false,
     held: false,
+    /** The seq of the call the tower is answering. A press then would throw that answer away. */
+    sending: 0,
     seq: 0,
     runId: undefined as string | undefined,
     speaker: new Speaker(),
     stream: null as MediaStream | null,
+    opening: null as Promise<MediaStream | null> | null,
     recorder: null as MediaRecorder | null,
     limit: undefined as ReturnType<typeof setTimeout> | undefined,
   }).current;
@@ -49,6 +52,7 @@ export function useCockpit() {
 
   const send = useCallback(async (path: string, body: Blob | string, type: string) => {
     const seq = ++r.seq;
+    r.sending = seq;
     r.speaker.stop();
     setPhase("thinking");
     setNote("");
@@ -60,6 +64,7 @@ export function useCockpit() {
     } catch {
       reply = { ok: false, message: "The tower did not answer. Try again, or type it." };
     }
+    if (r.sending === seq) r.sending = 0;
     if (!r.alive) return;
     // A newer press or a reset owns the radio now.
     if (seq !== r.seq) return void refresh();
@@ -96,7 +101,7 @@ export function useCockpit() {
         const type = rec.mimeType || chunks[0]?.type || "audio/webm";
         if (began && chunks.length && performance.now() - began >= MIN_MS) return void send("/api/cockpit/talk", new Blob(chunks, { type }), type);
         setPhase("idle");
-        setNote("Too short. Hold the key while you talk.");
+        setNote("Too short. Keep holding space while you talk.");
       };
       rec.start();
       r.recorder = rec;
@@ -107,35 +112,50 @@ export function useCockpit() {
     } catch {
       setMic("blocked");
       setPhase("idle");
-      setNote("This browser cannot record. Type instead.");
+      setNote("This browser cannot record. Open this page in Chrome, Safari or Vivaldi.");
     }
   }, [r, release, send]);
 
+  /** One request for the microphone at a time, shared by the screen opening and by the key. */
+  const openMic = useCallback(() => {
+    if (r.stream?.getAudioTracks().some((t) => t.readyState === "live")) return Promise.resolve(r.stream);
+    if (r.opening) return r.opening;
+    const asked = (async () => {
+      setMic("asking");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        // Permission can be answered after the screen has gone.
+        if (!r.alive) {
+          stream.getTracks().forEach((t) => t.stop());
+          return null;
+        }
+        r.stream = stream;
+        setMic("ready");
+        setNote("");
+        return stream;
+      } catch {
+        r.held = false;
+        if (!r.alive) return null;
+        setMic("blocked");
+        setNote("The microphone is blocked. Allow it in the address bar, then hold space again.");
+        return null;
+      }
+    })();
+    r.opening = asked;
+    void asked.finally(() => (r.opening = null));
+    return asked;
+  }, [r]);
+
   const press = useCallback(async () => {
-    if (r.held) return;
+    if (r.held || r.sending) return;
     r.held = true;
     r.speaker.stop();
     setPhase((p) => (p === "speaking" ? "idle" : p));
-    if (r.stream?.getAudioTracks().some((t) => t.readyState === "live")) return record(r.stream);
-
-    setMic("asking");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      // Permission can be answered after the screen has gone, or after another press got there first.
-      if (!r.alive || r.stream?.active) return stream.getTracks().forEach((t) => t.stop());
-      r.stream = stream;
-      setMic("ready");
-      setNote("");
-      if (r.held) record(stream);
-    } catch {
-      r.held = false;
-      if (!r.alive) return;
-      setMic("blocked");
-      setNote("No microphone. Type to the tower, or allow it and press again.");
-    }
-  }, [r, record]);
+    const stream = await openMic();
+    if (stream && r.held && !r.recorder) record(stream);
+  }, [r, openMic, record]);
 
   useEffect(() => {
     r.alive = true;
@@ -158,6 +178,10 @@ export function useCockpit() {
   }, [r, refresh, release]);
 
   const canTalk = !!state?.speech.available;
+  // Ask as the screen opens, so the first hold of the key is already heard.
+  useEffect(() => {
+    if (canTalk) void openMic();
+  }, [canTalk, openMic]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== "Space" || typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -201,7 +225,7 @@ export function useCockpit() {
   }, [state, phase, r, heardCalls]);
 
   const say = (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || r.sending) return;
     // Cancels a recording still in progress: the newest thing said wins.
     r.seq++;
     release();
@@ -212,6 +236,7 @@ export function useCockpit() {
   const command = async (path: string, body: object = {}) => {
     if (path.endsWith("/reset")) {
       r.seq++;
+      r.sending = 0;
       release();
       r.speaker.stop();
       setPhase("idle");

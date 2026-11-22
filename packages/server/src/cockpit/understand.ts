@@ -5,7 +5,7 @@ import { normalizeSpeech } from "@towerai/core";
 
 export type Claim = "engine" | "smoke" | "fuel" | "crash" | "other" | "airborne" | "ground" | "altitude";
 export type Topic =
-  | "takeoff" | "land" | "hold" | "human" | "allclear" | "insist" | "injection"
+  | "takeoff" | "land" | "hold" | "checkin" | "pushback" | "taxi" | "cross" | "human" | "allclear" | "insist" | "injection"
   | "status" | "altitude" | "speed" | "engines" | "fuel" | "weather" | "traffic" | "runway" | "callsign"
   | "repeat" | "help" | "hello" | "thanks" | "unknown";
 export type Meaning = { kind: "claim"; claim: Claim; feet?: number } | { kind: "topic"; topic: Topic };
@@ -47,6 +47,7 @@ const TOPICS: [Topic, RegExp][] = [
   ["allclear", NOT_SO],
   ["insist", /\b(?:i m serious|i am serious|not (?:joking|kidding)|i swear|i mean it|believe me|i m telling you|i can see it|yes we are|for real)\b/],
   ["human", /\bsend (?:help|someone|responders|trucks|an ambulance)\b|\bneed (?:help now|an ambulance|responders)\b|\b(?:human|real person|supervisor|real controller)\b|\bsave (?:me|us)\b/],
+  ["checkin", /\bcheck(?:ing|ed)? ?in\b|\bradio check\b/],
   ["hold", /\b(?<!can t )(?:stop|hold|abort|wait|cancel)\b(?! short)|\b(?:don t|do not) want to (?:take ?off|fly|go)\b|\bchanged my mind\b/],
   ["weather", /\b(?:weather|wind|windy|rain|raining|snow|storm|visibility|foggy|fog)\b/],
   ["traffic", /\b(?:traffic|other (?:planes?|aircraft)|planes? (?:near|around|nearby)|anyone (?:near|around|else)|who else)\b/],
@@ -57,6 +58,9 @@ const TOPICS: [Topic, RegExp][] = [
   ["status", /\bwhere (?:am i|are we)\b|\bwhat (?:do you see|is my status|s my status)\b|\b(?:my )?(?:status|vitals)\b|\bhave (?:i|we) taken off\b|\bare we (?:in the air|flying|moving|crashing)\b/],
   ["land", /\b(?:land|landing|go back|return to the airport|come back)\b/],
   ["callsign", /\b(?:who am i|call ?sign|what s my name|what am i called)\b/],
+  ["cross", /\bcross(?:ing)?\b/],
+  ["taxi", /\b(?:taxi|taxiing|taxy|taxing)\b|\bready to move\b|\bcontinue\b/],
+  ["pushback", /\bpush(?:ing|ed)? ?(?:back|us|me)\b|\bleave the gate\b/],
   ["takeoff", /\btake ?off\b|\btaking off\b|\bdepart(?:ure)?\b|\bready (?:to (?:go|fly|roll|leave)|when you are)\b|\bwant (?:to|2) (?:fly|go|leave)\b|\bwanna (?:fly|go|take ?off|leave)\b|\b(?:can|may|could) (?:i|we) (?:(?:like|just|please|maybe|actually) )*(?:fly|leave|go(?= now| please| \||$))\b|^(?:(?:ok|okay|yes|i m|we re|i am|we are|tower|all|\|) )*ready(?: now| \||$)|\blet s (?:go|fly|roll)\b|\b(?:get|getting) (?:\w+ ){0,3}(?:in the air|off the ground|airborne)\b|\blift ?off\b|\bline up\b/],
   ["repeat", /\b(?:say again|repeat|what was that|pardon|come again|didn t (?:hear|catch)|what do i (?:say|read))\b/],
   ["runway", /\brunway\b/],
@@ -86,7 +90,7 @@ export interface Readback {
 }
 
 /** Any word order, callsign optional. The instruction and every number that matters must still be right. */
-export function checkReadback(clearance: Pick<Clearance, "type" | "runway" | "vector">, text: string): Readback {
+export function checkReadback(clearance: Pick<Clearance, "type" | "runway" | "vector">, text: string, holdShort?: string): Readback {
   const words = plain(text).replace(/\btake (?:of|off)\b/g, "takeoff");
   const said = normalizeSpeech(words.replace(/\| (left|right)\b/g, "$1").replace(/\|/g, " x "))
     .replace(/\b(\d) (?:thousand)\b/g, "$1000")
@@ -111,6 +115,22 @@ export function checkReadback(clearance: Pick<Clearance, "type" | "runway" | "ve
     const said2 = has(/\bland\b/);
     attempted ||= said2 && has(/\b(?:cleared|clear)\b/);
     if (!said2 || has(/\btakeoff\b/)) missing.push("cleared to land");
+  } else if (clearance.type === "PUSHBACK") {
+    const pushed = has(/\bpush/);
+    attempted ||= pushed && has(/\b(?:approved|approve)\b/);
+    if (!pushed) missing.push("pushback approved");
+  } else if (clearance.type === "TAXI") {
+    const taxied = has(/\btax(?:i|y|iing|ing)\b/);
+    attempted ||= taxied;
+    if (!taxied) missing.push("taxi");
+  } else if (clearance.type === "CROSS_RUNWAY") {
+    const crossed = has(/\bcross/);
+    attempted ||= crossed;
+    if (!crossed) missing.push("cross");
+  } else if (clearance.type === "CONTINUE_TAXI") {
+    const on = has(/\bcontinu/);
+    attempted ||= on;
+    if (!on) missing.push("continue taxi");
   } else if (clearance.vector) {
     const heading = String(clearance.vector.headingDeg).padStart(3, "0");
     attempted ||= has(/\b(?:heading|maintain)\b/);
@@ -118,7 +138,11 @@ export function checkReadback(clearance: Pick<Clearance, "type" | "runway" | "ve
     if (!has(new RegExp(`\\b(?:${heading}|${Number(heading)})(?!\\d)`)) || has(new RegExp(`\\bturn ${other}\\b`))) missing.push(`heading ${heading}`);
     if (!has(new RegExp(`(?<!\\d)${clearance.vector.altitudeFt}\\b`))) missing.push(`${clearance.vector.altitudeFt} feet`);
   }
-  if (want && (!runways.length || runways.some((r) => r !== want))) missing.push(`runway ${clearance.runway}`);
+  const short = holdShort?.toLowerCase();
+  const named = short ? runways.filter((r) => r !== short) : runways;
+  if (want && (!named.length || named.some((r) => r !== want))) missing.push(`runway ${clearance.runway}`);
+  // The part of a taxi clearance that must never be left out.
+  if (short && (!has(/\bhold/) || !runways.includes(short))) missing.push(`hold short runway ${holdShort}`);
   if (refused) missing.push("a clear yes");
   return { attempted: attempted && !question && !(refused && !runways.length), missing };
 }

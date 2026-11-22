@@ -448,7 +448,8 @@ export class Ops {
     parts.push(ahead ? `${ahead.aircraft.callsign} lands before it, ${Math.round(ahead.distanceNm)} miles out.` : `Nothing is ahead of it to runway ${ac.assignedRunway}.`);
     if (behind) parts.push(`${behind.aircraft.callsign} is ${Math.max(1, Math.round(behind.distanceNm - miles))} miles behind it.`);
     const on = sim.runwayState.get(physical)?.occupants.filter((id) => id !== ac.id) ?? [];
-    parts.push(on.length ? `${on.map((id) => sim.get(id)?.callsign ?? id).join(" and ")} ${on.length > 1 ? "are" : "is"} on runway ${ac.assignedRunway} now.` : `Runway ${ac.assignedRunway} is clear right now.`);
+    if (sim.closedRunways.includes(physical)) parts.push(`Runway ${ac.assignedRunway} is closed.`);
+    else parts.push(on.length ? `${on.map((id) => sim.get(id)?.callsign ?? id).join(" and ")} ${on.length > 1 ? "are" : "is"} on runway ${ac.assignedRunway} now.` : `Runway ${ac.assignedRunway} is clear right now.`);
     return {
       approach: { runway, miles: tidy(miles, 1), decisionNm: sim.config.rules.decisionDistanceNm, others },
       around: parts.join(" "),
@@ -466,6 +467,11 @@ export class Ops {
       ...record.markers.map((m) => ({ t: m.t, marker: m })),
       ...record.messages.map((m) => ({ t: m.t, message: m })),
     ].sort((a, b) => a.t - b.t);
+    // The clearance behind a line has the gate and runway it named. A line said again has a new id, hence the fallback.
+    const instruction = (m: Message) => {
+      const type = m.decision!.action as ClearanceType;
+      return [...this.sim.clearances.values()].find((x) => x.transmissionId === m.id) ?? { type, gate: ac.flight === "arrival" ? ac.gate : undefined };
+    };
     for (const e of events) {
       if ("marker" in e && e.marker) {
         const m = e.marker;
@@ -491,9 +497,9 @@ export class Ops {
       } else if (m.from === "operator") {
         if (/priority/i.test(m.text)) add(m.t, `You gave it priority to land on ${ac.assignedRunway}`);
         else if (/paramedics/i.test(m.text)) add(m.t, `You called paramedics to gate ${ac.gate}`);
-        else if (m.decision?.action) add(m.t, `You told it to ${this.order({ type: m.decision.action as ClearanceType }, ac)}`);
+        else if (m.decision?.action) add(m.t, `You told it to ${this.order(instruction(m), ac)}`);
       } else if (m.from === "controller" && m.kind === "clearance" && m.decision?.action) {
-        add(m.t, `Agent told it to ${this.order({ type: m.decision.action as ClearanceType }, ac)}`);
+        add(m.t, `Agent told it to ${this.order(instruction(m), ac)}`);
       }
     }
     return lines.slice(-4);

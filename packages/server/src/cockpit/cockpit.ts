@@ -1,4 +1,4 @@
-import type { CockpitState, CrossCheck, Exchange, Fault, Timing, Vitals } from "@towerai/contracts";
+import type { CockpitState, CrossCheck, Exchange, Fault, Stage, Timing, Vitals } from "@towerai/contracts";
 import {
   DEFAULT_RULES,
   NM,
@@ -20,6 +20,24 @@ import { checkReadback, understand, type Claim, type Meaning, type Topic } from 
 const ME = "ACA7";
 const NAME = "Air Canada 7";
 const RUNWAY = "24L";
+const GATE = "178";
+/** Simulated seconds per real second while there is nothing to say. */
+const FAST = { pushback: 12, taxi: 12, crossing: 10, lineUp: 7, roll: 4, climbOut: 2, returning: 4 };
+const HELPS: Record<Stage, string> = {
+  check_in: "It finds your aircraft in live data before it says a word.",
+  pushback: "It makes sure nobody is taxiing behind you before you move.",
+  taxi: "It plans your route and stops you short of the live runway.",
+  cross: "It checks nobody is landing or rolling before you cross.",
+  takeoff: "It checks the runway, the arrivals and the gap to the last departure.",
+  climb: "It keeps watching your data, and checks any report against it.",
+};
+const ASKS: Record<Exclude<Stage, "climb">, { now: string; say: string; topic: Topic }> = {
+  check_in: { now: "You're at the gate. Check in with the tower.", say: "Tower, Air Canada 7, checking in", topic: "checkin" },
+  pushback: { now: "You're on their screen. Ask to leave the gate.", say: "Air Canada 7, request pushback", topic: "pushback" },
+  taxi: { now: "You're clear of the gate. Ask for a route to the runway.", say: "Air Canada 7, ready to taxi", topic: "taxi" },
+  cross: { now: "A live runway is in your way. Ask before you cross.", say: "Air Canada 7, request to cross", topic: "cross" },
+  takeoff: { now: "You're at your runway. Ask to take off.", say: "Air Canada 7, ready for takeoff", topic: "takeoff" },
+};
 const ISSUER = "cockpit-tower";
 const FRAME_MS = 50;
 const MAX_TEXT = 300;
@@ -28,15 +46,15 @@ const VOICE_TIMEOUT_MS = 6000;
 const SCENARIO: Scenario = {
   id: "cockpit",
   name: "Pilot's seat",
-  description: "The visitor holds short of runway 24L at Toronto Pearson, with a little traffic.",
+  description: "The visitor is at gate 178 at Toronto Pearson, bound for runway 24L, with a little traffic.",
   airport: "cyyz",
   seed: 247,
   activeRunways: { arrivals: ["23", "24R"], departures: ["23", "24L"] },
   emergencyMode: "manual",
   aircraft: [
-    { callsign: ME, type: "A320", pilotType: "human", flight: "departure", runway: RUNWAY, start: { kind: "holding_short" } },
+    { callsign: ME, type: "A320", pilotType: "human", flight: "departure", runway: RUNWAY, gate: GATE, readyInSec: 86_400, start: { kind: "gate" } },
     { callsign: "WJA302", type: "B38M", flight: "arrival", runway: "23", gate: "141", start: { kind: "approach", distanceNm: 7, cleared: true } },
-    { callsign: "DAL482", type: "B739", flight: "arrival", runway: "24R", gate: "B11", start: { kind: "approach", distanceNm: 11, cleared: true } },
+    // Nothing lands on 24R, which the visitor crosses: however long they take, it stays open to them.
     { callsign: "JZA781", type: "CRJ9", flight: "departure", runway: "23", start: { kind: "taxiing", from: "A.15" } },
     { callsign: "ROU1861", type: "A321", flight: "arrival", runway: "23", gate: "135", start: { kind: "taxiing", from: "X.204" } },
   ],
@@ -46,6 +64,10 @@ const OPTIONS: Record<string, string> = {
   chat: "small talk, a joke, nonsense or anything off topic",
   help: "does not know what to do or say",
   takeoff: "wants to take off now",
+  checkin: "is checking in or asks for a radio check",
+  pushback: "wants to push back from the gate",
+  taxi: "wants to taxi to the runway",
+  cross: "wants to cross a runway",
   land: "wants to land",
   hold: "wants to stop or wait",
   human: "wants help sent or a human controller",
@@ -65,6 +87,8 @@ const OPTIONS: Record<string, string> = {
   "claim:fuel": "says fuel is low",
   "claim:other": "reports some other danger, illness or damage",
 };
+/** What lets the visitor's aircraft move on the ground. */
+const MOVES: ReadonlySet<ClearanceType> = new Set<ClearanceType>(["PUSHBACK", "TAXI", "CROSS_RUNWAY", "CONTINUE_TAXI", "CLEARED_TAKEOFF"]);
 /** Where the rules are sure, or safety is involved, nobody waits for a model. */
 const ASK_MODEL: ReadonlySet<Topic> = new Set<Topic>(["unknown"]);
 
@@ -107,6 +131,7 @@ class Run {
   private responders = false;
   private nextLook = 0;
   private serial = 0;
+  private checkedIn = false;
 
   constructor(private readonly unprompted: (run: Run, exchange: Exchange) => void) {
     this.sim = createSimulation(SCENARIO, {
@@ -121,11 +146,76 @@ class Run {
     return this.sim.get(ME)!;
   }
 
-  /** The roll is 45 s in real time, which is a long silence on a stage. */
+  /** Moving is sped up. Whenever it is the pilot's turn, or something is wrong, time is real. */
   get speed(): number {
-    const { phase, emergencyId, flags, holdPosition } = this.me;
-    if (!holdPosition && this.committed()) return 3; // the crawl on to the runway
-    return phase === "takeoff" || emergencyId || flags.emergencyReturn ? 2 : 1;
+    const { phase, emergencyId, flags, holdPosition, altitudeFt } = this.me;
+    if (this.pending() || this.alarm || (this.faults.size && !this.mayday)) return 1;
+    if (phase === "rollout") return FAST.returning;
+    if ((emergencyId || flags.emergencyReturn) && altitudeFt > 0) return phase === "landing" ? 2 : FAST.returning;
+    if (this.alarm || this.faults.size || holdPosition) return 1;
+    if (phase === "takeoff") return altitudeFt > 0 ? FAST.climbOut : FAST.roll;
+    if (phase === "departure") return altitudeFt < 900 ? FAST.climbOut : 1;
+    if (!this.rolling()) return 1;
+    if (phase === "pushback") return FAST.pushback;
+    if (phase === "taxi_out") return FAST.taxi;
+    return this.crossing() ? FAST.crossing : FAST.lineUp;
+  }
+
+  /** A movement was cleared and has not finished. */
+  private rolling(): boolean {
+    const ac = this.me;
+    if (ac.phase === "pushback") return !ac.flags.pushbackComplete;
+    return ac.phase === "taxi_out" || ac.phase === "line_up" || (ac.phase === "holding_short" && Object.keys(ac.runwayAuth).length > 0);
+  }
+
+  /** Stopped on the way, so it is taxiing that has to resume, not the takeoff. */
+  private stoppedShort(): boolean {
+    const { holdPosition, phase } = this.me;
+    if (!holdPosition) return false;
+    return phase === "pushback" || phase === "taxi_out" || (phase === "holding_short" && !!this.crossing());
+  }
+
+  /** The runway still to cross on the way out, by the end that is in use. */
+  private crossing(): string | undefined {
+    const ac = this.me;
+    if (ac.flight !== "departure" || ac.altitudeFt > 0) return undefined;
+    const g = this.sim.graph;
+    const own = g.runwayEnd(RUNWAY)!.runway.id;
+    const route =
+      ac.phase === "at_gate" || ac.phase === "pushback"
+        ? (g.shortestPath(g.gates.get(GATE)!.pushbackNode!, g.departureHolds(RUNWAY), {})?.path ?? [])
+        : ac.route.slice(Math.max(0, ac.currentWaypointIndex - 1));
+    const id = g.crossings(route).find((r) => r !== own);
+    return id?.split("/").find((end) => this.sim.activeRunways.arrivals.includes(end)) ?? id?.split("/")[0];
+  }
+
+  get stage(): Stage {
+    const ac = this.me;
+    if (ac.flight !== "departure" || ac.altitudeFt > 0) return "climb";
+    switch (ac.phase) {
+      case "at_gate": return this.checkedIn ? "pushback" : "check_in";
+      case "pushback": return ac.flags.pushbackComplete ? "taxi" : "pushback";
+      case "taxi_out": return this.crossing() ? "taxi" : "takeoff";
+      case "holding_short": return this.crossing() ? "cross" : "takeoff";
+      case "line_up": case "takeoff": return "takeoff";
+      default: return "climb";
+    }
+  }
+
+  get waiting(): boolean {
+    if (this.pending() || this.alarm || (this.faults.size && !this.mayday) || this.me.holdPosition) return true;
+    return this.stage !== "climb" && this.me.phase !== "takeoff" && !this.rolling();
+  }
+
+  get helps(): string {
+    return HELPS[this.stage];
+  }
+
+  path(): { x: number; y: number }[] {
+    const ac = this.me;
+    if (ac.altitudeFt > 0 || ac.phase === "takeoff") return [];
+    const { route, currentWaypointIndex } = ac;
+    return route.slice(currentWaypointIndex).map((n) => this.sim.graph.pos(n)).map(({ x, y }) => ({ x, y }));
   }
 
   step(): void {
@@ -163,7 +253,10 @@ class Run {
   status(ac = this.me): string {
     const rw = ac.assignedRunway ? `runway ${ac.assignedRunway}` : "the runway";
     switch (ac.phase) {
-      case "holding_short": return `holding short of ${rw}`;
+      case "holding_short": {
+        const short = ac.id === ME ? this.crossing() : undefined;
+        return `holding short of ${short ? `runway ${short}` : rw}`;
+      }
       case "line_up": return `${ac.holdPosition ? "stopped on" : "lining up on"} ${rw}`;
       case "takeoff": return ac.altitudeFt > 0 ? `lifting off ${rw}` : `takeoff roll on ${rw}`;
       case "departure": return `airborne, climbing out of ${rw}`;
@@ -174,7 +267,7 @@ class Run {
       case "rollout": return `landed, slowing on ${rw}`;
       case "taxi_out": return `taxiing to ${rw}`;
       case "taxi_in": return ac.speedKts > 1 ? "taxiing in after landing" : "stopped after landing";
-      case "at_gate": return "parked at the gate";
+      case "at_gate": return ac.id === ME ? `parked at gate ${GATE}` : "parked at the gate";
       case "pushback": return "pushing back";
     }
   }
@@ -206,6 +299,13 @@ class Run {
 
   /** What to say back, in the fewest words that still pass. */
   sayBack(c: Clearance): string {
+    if (c.type === "PUSHBACK") return "Pushback approved";
+    if (c.type === "CONTINUE_TAXI") return "Continue taxi";
+    if (c.type === "CROSS_RUNWAY") return `Cross runway ${c.runway}`;
+    if (c.type === "TAXI") {
+      const short = this.crossing();
+      return `Taxi to runway ${c.runway}${short ? `, hold short runway ${short}` : ""}`;
+    }
     if (c.vector) return `Heading ${String(c.vector.headingDeg).padStart(3, "0")}, maintain ${c.vector.altitudeFt / 1000} thousand, runway ${c.runway}`;
     return `${c.type === "CLEARED_TAKEOFF" ? "Cleared for takeoff" : "Cleared to land"}, runway ${c.runway}`;
   }
@@ -213,6 +313,13 @@ class Run {
   private instruction(c: Clearance): string {
     if (c.vector) {
       return `roger mayday, engine out confirmed. Turn ${c.vector.turn} heading ${String(c.vector.headingDeg).padStart(3, "0")}, maintain ${c.vector.altitudeFt / 1000} thousand, runway ${c.runway}, number one. Responders alerted. Read that back.`;
+    }
+    if (c.type === "PUSHBACK") return "pushback approved, it's clear behind you. Now say: pushback approved.";
+    if (c.type === "CONTINUE_TAXI") return "you can carry on. Now say: continue taxi.";
+    if (c.type === "CROSS_RUNWAY") return `nobody's on it, cross runway ${c.runway}. Now say: cross runway ${c.runway}.`;
+    if (c.type === "TAXI") {
+      const short = this.crossing();
+      return `taxi to runway ${c.runway}${short ? `, hold short of runway ${short}` : ""}. Follow the line. Read that back.`;
     }
     const what = c.type === "CLEARED_TAKEOFF" ? "cleared for takeoff" : "cleared to land";
     return `runway ${c.runway}, ${what}. Now say: ${what}, runway ${c.runway}.`;
@@ -241,9 +348,9 @@ class Run {
   }
 
   private stop(reason: string): Issued | null {
-    this.cancel((c) => c.type === "CLEARED_TAKEOFF", reason);
+    this.cancel((c) => MOVES.has(c.type), reason);
     const { phase, holdPosition } = this.me;
-    if (holdPosition || !["holding_short", "line_up", "taxi_in"].includes(phase)) return null;
+    if (holdPosition || !["pushback", "taxi_out", "holding_short", "line_up", "taxi_in"].includes(phase)) return null;
     return this.issue("HOLD_POSITION", reason);
   }
 
@@ -266,16 +373,22 @@ class Run {
   setFault(fault: Fault, on: boolean): void {
     if (on) this.faults.add(fault);
     else this.faults.delete(fault);
-    if (!on) return;
-    this.cancel((c) => c.type === "CLEARED_TAKEOFF", `aircraft data shows ${fault}`);
+    if (!on) {
+      if (!this.faults.size && this.mayday && this.me.flight === "departure" && this.me.altitudeFt <= 0 && this.me.phase !== "takeoff") {
+        // The data is normal again. The pilot still has to say so before anything moves.
+        this.mayday = false;
+        this.alarm ??= "other";
+      }
+      return;
+    }
+    this.cancel((c) => MOVES.has(c.type), `aircraft data shows ${fault}`);
     if (this.committed()) this.stop(`aircraft data shows ${fault}`);
     this.failEngine();
   }
 
-  /** Cleared on to the runway and not yet rolling: it can still be stopped. */
+  /** Cleared to move and not yet on the takeoff roll: it can still be stopped. */
   private committed(): boolean {
-    const { phase, runwayAuth } = this.me;
-    return phase === "line_up" || (phase === "holding_short" && Object.keys(runwayAuth).length > 0);
+    return this.me.flight === "departure" && this.rolling();
   }
 
   private failEngine(): void {
@@ -341,7 +454,7 @@ class Run {
     if (!c) return null;
     if (meaning.kind === "claim" && !(c.vector || c.type === "CLEARED_TO_LAND")) return null;
     if (meaning.kind === "topic" && ["injection", "human", "hold"].includes(meaning.topic)) return null;
-    const { attempted, missing } = checkReadback(c, text);
+    const { attempted, missing } = checkReadback(c, text, c.type === "TAXI" ? this.crossing() : undefined);
     if (!attempted) return null;
     // "Engine failure" is not a botched readback.
     if (meaning.kind === "claim" && missing.length) return null;
@@ -354,9 +467,9 @@ class Run {
         action: { type: c.type, verdict: "rejected", blockedBy: `readback: ${missing.join(", ")}` },
       };
     }
-    if (c.type === "CLEARED_TAKEOFF" && (this.alarm || this.faults.size)) {
-      this.stop("danger reported before takeoff");
-      return { said: `${NAME}, hold position. There's an open problem on your aircraft, so that takeoff is cancelled.`, intent, reason: "A danger is open.", action: { type: c.type, verdict: "rejected", blockedBy: "open emergency" } };
+    if (MOVES.has(c.type) && (this.alarm || this.faults.size)) {
+      this.stop("danger reported before moving");
+      return { said: `${NAME}, hold position. There's an open problem on your aircraft, so that clearance is cancelled.`, intent, reason: "A danger is open.", action: { type: c.type, verdict: "rejected", blockedBy: "open emergency" } };
     }
     // The form was lenient; the simulator still gets, and re-validates, the standard words.
     const result = this.sim.dispatch({ type: "pilot.readback", aircraftId: ME, clearanceId: c.id, text: c.expectedReadback, spoken: true });
@@ -364,7 +477,11 @@ class Run {
       return { said: `${NAME}, hold on, that clearance is no longer valid. Stand by for a new one.`, intent, reason: result.message, action: { type: c.type, verdict: "rejected", blockedBy: result.message } };
     }
     const said =
-      c.type === "CLEARED_TAKEOFF" ? "readback correct. You're rolling. Enjoy the view, and call me if anything feels wrong."
+      c.type === "PUSHBACK" ? "readback correct. Pushing you back. Ask me to taxi when you stop."
+      : c.type === "TAXI" ? "readback correct. Off you go. I'm watching every turn."
+      : c.type === "CROSS_RUNWAY" ? "readback correct. Cross now. Your runway is next."
+      : c.type === "CONTINUE_TAXI" ? "readback correct. Rolling again."
+      : c.type === "CLEARED_TAKEOFF" ? "readback correct. You're rolling. Enjoy the view, and call me if anything feels wrong."
       : c.vector ? "readback correct. You're turning home and you're number one. I'll call you to land."
       : "readback correct. The runway is yours. Responders are alerted.";
     return { said: `${NAME}, ${said}`, intent, reason: "Instruction and numbers correct, so the clearance is active in the simulator.", action: { type: c.type, verdict: "accepted" } };
@@ -417,7 +534,7 @@ class Run {
       : `${height(v.altFt)} feet, ${v.gsKt} knots`;
 
     if (state) {
-      const next = air ? "How can I help?" : "Ready to fly? Say: ready for takeoff.";
+      const next = air ? "How can I help?" : `${this.prompt().trim() || "What do you need?"}`;
       return {
         said: holds ? `${NAME}, confirmed, I show you ${where}. ${next}` : `${NAME}, I show you ${where}, so that doesn't match. What are you seeing?`,
         intent, check,
@@ -430,7 +547,7 @@ class Run {
     this.alarm = claim;
     this.doubts++;
     const stopped = this.committed() ? this.stop(`pilot reported ${words[claim]}`) : null;
-    const cancelled = this.cancel((c) => c.type === "CLEARED_TAKEOFF", `pilot reported ${words[claim]}`);
+    const cancelled = this.cancel((c) => MOVES.has(c.type), `pilot reported ${words[claim]}`);
     if (claim === "other" || (again && this.doubts > 1)) return this.escalate(intent, check, claim === "other");
 
     const engineWords = "both engines normal";
@@ -441,7 +558,7 @@ class Run {
       : `${where}, ${engineWords}`;
     // The plainest proof that it has read the aircraft, not just the words.
     const unflown = claim === "crash" && v.onGround && this.me.flight === "departure" && this.me.phase !== "takeoff" ? " You haven't taken off." : "";
-    const offer = stopped || cancelled ? "I've cancelled takeoff. Want help sent?" : air ? "Need help?" : "Say hold, or send help.";
+    const offer = stopped || cancelled ? (this.stage === "takeoff" ? "I've cancelled takeoff. Want help sent?" : "I've stopped you. Want help sent?") : air ? "Need help?" : "Say everything is fine, or send help.";
     return {
       said: `${NAME}, I hear you. I show you ${data}.${unflown} What do you see? ${offer}`,
       intent, check,
@@ -486,6 +603,54 @@ class Run {
     };
   }
 
+  /** The next thing to say, for the end of an answer. */
+  private prompt(): string {
+    const waiting = this.pending();
+    if (waiting) return ` Say: ${this.sayBack(waiting)}.`;
+    const stage = this.stage;
+    if (this.alarm || stage === "climb" || !this.waiting) return "";
+    if (this.stoppedShort()) return " When you're ready, say: ready to move.";
+    return ` When you're ready, say: ${ASKS[stage].say.replace(`${NAME}, `, "").replace(/^Tower, /, "")}.`;
+  }
+
+  /** The steps before takeoff. Asked out of order, the tower says which one comes first. */
+  private ground(asked: Topic, heard: string): Answer {
+    const stage = this.stage;
+    const intent = asked;
+    const reply = (said: string, reason: string, more: Partial<Answer> = {}): Answer => ({ said: `${NAME}, ${said}`, intent, reason, ...more });
+    const waiting = this.pending();
+    if (waiting) return reply(this.instruction(waiting), "A clearance is already waiting for its readback.");
+    if (this.faults.size || this.alarm) return this.takeoff(heard);
+    if (stage === "climb") return this.takeoff(heard);
+    if (this.stoppedShort()) {
+      // A stop acts when it is spoken, so being ready again stands in for its readback.
+      this.cancel((c) => c.type === "HOLD_POSITION", "pilot is ready again");
+      if (!this.me.holdPosition) return reply("carry on, you're free to move.", "The stop was withdrawn.");
+      const { clearance, action } = this.issue("CONTINUE_TAXI", "The pilot is ready again and nothing is wrong.");
+      if (clearance) return reply(this.instruction(clearance), "The validator allows it to move again.", { action });
+      return reply("stay where you are a moment, then ask me again.", action.blockedBy!, { action });
+    }
+    if (stage === "check_in") {
+      this.checkedIn = true;
+      if (asked !== "pushback") {
+        return reply(`Toronto Tower, I have you at gate ${GATE}, both engines normal. Next, say: request pushback.`, "Checked in: the aircraft was found in live data.", { action: { type: "CHECK_IN", verdict: "accepted" } });
+      }
+    } else if (asked === "checkin") {
+      return reply(`loud and clear.${this.prompt()}`, "Already checked in.");
+    } else if (this.rolling()) {
+      return reply(`you're already cleared and moving. I'll have your next step when you stop.`, `Already ${this.status()}.`);
+    } else if (asked !== ASKS[stage].topic && !(asked === "takeoff" && /^\W*(?:(?:ok|okay|we re|i m|we're|i'm) )?ready\W*$/i.test(heard))) {
+      return reply(`one step first.${this.prompt()}`, `The next step is ${stage.replace("_", " ")}.`);
+    }
+    const next = this.stage;
+    if (next === "takeoff") return this.takeoff(heard);
+    const type: ClearanceType = next === "pushback" ? "PUSHBACK" : next === "taxi" ? "TAXI" : "CROSS_RUNWAY";
+    const runway = type === "TAXI" ? RUNWAY : type === "CROSS_RUNWAY" ? this.crossing() : undefined;
+    const { clearance, action } = this.issue(type, `The pilot asked to ${next === "pushback" ? "push back" : next}.`, runway);
+    if (!clearance) return reply("not this second, it isn't clear yet. Stay put and ask me again shortly.", action.blockedBy!, { action });
+    return reply(this.instruction(clearance), "The validator checked the traffic and found it clear.", { action });
+  }
+
   private takeoff(heard: string): Answer {
     const intent = "takeoff";
     const rules = "The pilot asked to take off.";
@@ -500,7 +665,7 @@ class Run {
       return { said: `${NAME}, I can't clear you. Your data shows a fault. Hold position, a human controller and responders are alerted.`, intent, reason: "A fault is active.", action: held?.action ?? { type: "CLEARED_TAKEOFF", verdict: "rejected", blockedBy: "active fault" }, callsHuman: true };
     }
     if (this.alarm) {
-      return { said: `${NAME}, you reported trouble, so no takeoff yet. If you're truly okay, say: everything is fine.`, intent, reason: "A reported danger has not been withdrawn.", action: { type: "CLEARED_TAKEOFF", verdict: "rejected", blockedBy: "reported danger not withdrawn" } };
+      return { said: `${NAME}, you reported trouble, so nothing moves yet. If you're truly okay, say: everything is fine.`, intent, reason: "A reported danger has not been withdrawn.", action: { type: "CLEARED_TAKEOFF", verdict: "rejected", blockedBy: "reported danger not withdrawn" } };
     }
     this.cancel((c) => c.type === "HOLD_POSITION", "pilot is ready again");
     this.sim.dispatch({ type: "pilot.request", aircraftId: ME, requestType: "TAKEOFF", runway: RUNWAY, text: heard || "Ready for departure.", spoken: true });
@@ -514,14 +679,19 @@ class Run {
     const air = !v.onGround;
     const ac = this.me;
     const waiting = this.pending();
-    const ready = !air && ac.phase === "holding_short";
-    const prompt = waiting ? ` Say: ${this.sayBack(waiting)}.` : ready && !this.alarm ? " When you're ready, say: ready for takeoff." : "";
+    const ready = !air && this.stage !== "climb" && this.waiting;
+    const prompt = this.prompt();
     const reply = (said: string, reason: string, more: Partial<Answer> = {}): Answer => ({ said: `${NAME}, ${said}`, intent: topic, reason, ...more });
     const where = air ? `${height(v.altFt)} feet, ${v.gsKt} knots` : v.gsKt < 1 ? "stationary on the ground, zero knots" : `on the ground at ${v.gsKt} knots`;
 
     switch (topic) {
+      case "checkin":
+      case "pushback":
+      case "taxi":
+      case "cross":
+        return this.ground(topic, heard);
       case "takeoff":
-        return this.takeoff(heard);
+        return !this.stoppedShort() && (this.stage === "takeoff" || this.stage === "climb") ? this.takeoff(heard) : this.ground(topic, heard);
       case "human":
         this.alarm ??= "other";
         return this.faults.size ? this.confirmed(topic, undefined, where, v) : this.escalate(topic);
@@ -532,13 +702,13 @@ class Run {
         if (this.faults.size) return reply("glad you're calm, but your data still shows a fault. Help stays with you.", "The data still shows a fault.", { callsHuman: true });
         this.alarm = null;
         this.doubts = 0;
-        return reply(`good to hear, and your data agrees.${prompt || (air ? " Enjoy the flight." : " Say: ready for takeoff, when you are.")}`, "The report was withdrawn and the data is normal.");
+        return reply(`good to hear, and your data agrees.${prompt || (air ? " Enjoy the flight." : "")}`, "The report was withdrawn and the data is normal.");
       case "injection":
         return reply("I can only work your aircraft, by the safety rules. What do you need for your flight?", "Treated as data: words from the cockpit cannot change rules or other aircraft.");
       case "hold": {
         if (ac.phase === "takeoff" || air) return reply("I can't stop you from here, you're moving too fast. Tell me what's wrong, or say: send help.", "Past the point where the validator allows a hold.");
         const held = this.stop("pilot asked to stop");
-        return reply("hold position. Nothing moves until you're ready. Then say: ready for takeoff.", "The pilot asked to stop.", { action: held?.action });
+        return reply(`hold position. Nothing moves until you're ready.${this.stage === "takeoff" && ac.phase !== "taxi_out" ? " Then say: ready for takeoff." : " Then say: ready to move."}`, "The pilot asked to stop.", { action: held?.action });
       }
       case "land": {
         if (!air) return reply(`you're already on the ground.${prompt}`, "Already on the ground.");
@@ -577,9 +747,10 @@ class Run {
         // "Help!" after reporting danger is not a request for a lesson.
         if (this.alarm && !waiting) return this.faults.size ? this.confirmed(topic, undefined, where, v) : this.escalate(topic);
         if (waiting) return reply(`you're doing great. Just repeat the clearance.${prompt}`, "A readback is due.");
-        if (ready) return reply("no experience needed. You're holding by the runway. Just say: ready for takeoff. I'll do the rest.", "Guidance for a beginner.");
+        if (ready) return reply(`no experience needed. I'll walk you through it.${prompt}`, "Guidance for a beginner.");
         return reply(air ? "you're flying nicely. Ask me your height or traffic, or tell me if something's wrong." : `you're ${this.status()}. Ask me anything.`, "Guidance for where they are.");
       case "hello":
+        if (this.stage === "check_in" && !this.alarm) return this.ground("checkin", heard);
         return reply(`Toronto Tower, loud and clear. I'll talk you through it.${prompt}`, "Greeting.");
       case "thanks":
         return reply(`any time.${prompt}`, "Thanks.");
@@ -598,18 +769,23 @@ class Run {
     const c = this.pending();
     const ac = this.me;
     const v = this.vitals();
-    if (c) return { now: "The tower gave you a clearance. Say it back and the aircraft will act on it.", trySaying: [this.sayBack(c), "Say again?"] };
+    if (c) return { now: this.faults.size || this.mayday ? "Emergency. Read back your way home." : "Read it back, and your plane acts on it.", trySaying: [this.sayBack(c), "Say again?"] };
+    if (v.onGround && ac.flight === "arrival") return { now: "You're back on the ground. Reset to fly again.", trySaying: ["Thanks, tower", "Where am I?"] };
     if (this.faults.size && !this.mayday) {
       const line = v.engines[0] === 0 ? "Mayday, our engine failed!" : v.smoke ? "Mayday, there's smoke!" : "Mayday, we're low on fuel!";
       return { now: "Something is wrong with your aircraft. Tell the tower.", trySaying: [line, "What do you see on my aircraft?"] };
     }
     if (this.faults.size || this.mayday) return { now: `Emergency: you have priority, ${this.status()}.`, trySaying: ["What do you see?", "Send help", "How high am I?"] };
-    if (this.alarm) return { now: "The tower is checking your report against the aircraft's data.", trySaying: ["I'm serious, send help", "Everything is fine"] };
-    if (v.onGround && ac.phase === "holding_short") return { now: "You are beside the runway. Ask to take off, in any words.", trySaying: ["I want to take off, what do I need?", "Is there other traffic?", "We're crashing!"] };
-    if (v.onGround && ac.flight === "arrival") return { now: "You're back on the ground. Reset to fly again.", trySaying: ["Thanks, tower", "Where am I?"] };
+    if (this.alarm) return { now: "Your aircraft's data shows no emergency. Stand down, or ask for help.", trySaying: ["Everything is fine", "I'm serious, send help"] };
+    const stage = this.stage;
+    if (ac.holdPosition && stage !== "climb") return { now: "You're stopped. Tell the tower when you're ready to move.", trySaying: [this.stoppedShort() ? "Air Canada 7, ready to move" : ASKS.takeoff.say, "Is there other traffic?"] };
+    if (stage !== "climb" && this.waiting) return { now: ASKS[stage].now, trySaying: [ASKS[stage].say, stage === "check_in" ? "Oh no, we're crashing!" : "What do I need to do?"] };
+    if (ac.phase === "pushback") return { now: "The tug is pushing you back from the gate.", trySaying: ["Stop!", "Is there other traffic?"] };
+    if (ac.phase === "taxi_out") return { now: "You're taxiing along the route the tower planned.", trySaying: ["Where am I?", "Stop!"] };
+    if (stage === "cross") return { now: "You're crossing a live runway, with the tower's permission.", trySaying: ["Where am I?", "Is there other traffic?"] };
     if (v.onGround && ac.phase === "takeoff") return { now: "You're rolling. Look ahead and enjoy it.", trySaying: ["How fast am I going?", "Our engine failed!"] };
     if (v.onGround) return { now: ac.phase === "line_up" ? "You're moving onto the runway." : `You are ${this.status()}.`, trySaying: ["How fast am I going?", "Stop!"] };
-    return { now: "You're flying. Ask anything, or report a problem.", trySaying: ["How high am I?", "Our engine failed!", "Any traffic near me?"] };
+    return { now: "You're flying. Ask anything, or report a problem.", trySaying: ["How high am I?", "We're crashing!", "Any traffic near me?"] };
   }
 }
 
@@ -732,6 +908,11 @@ export function createCockpit({ api = null }: { api?: ElevenLabs | null } = {}) 
         faults: [...run.faults],
         traffic: run.others().map((o) => ({ callsign: o.callsign, x: o.position.x, y: o.position.y, altFt: Math.round(o.altitudeFt), hdg: Math.round(o.headingDeg + 360) % 360, status: run.status(o) })),
         coach: run.coach(),
+        stage: run.stage,
+        waiting: run.waiting,
+        helps: run.helps,
+        speed: run.speed,
+        path: run.path(),
         readBack: waiting ? run.sayBack(waiting) : null,
         humanCalled: run.humanCalled,
         exchanges: [...run.exchanges],
