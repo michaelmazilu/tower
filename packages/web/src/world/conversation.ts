@@ -235,7 +235,6 @@ export class Conversation {
   private voiceOf(flight: FlightRecord, m: Message): Promise<Voice | null> {
     const recorded = sameOrigin(m.audioUrl);
     if (recorded) return Promise.resolve({ url: recorded, timing: m.timings.find((x) => x.stage === "voice" && x.kind === "measured") });
-    if (m.from === "operator") return Promise.resolve(null);
     const held = this.got.get(m.id);
     if (held) return Promise.resolve(held);
     const pending = this.asking.get(m.id);

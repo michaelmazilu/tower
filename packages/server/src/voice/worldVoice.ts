@@ -1,8 +1,8 @@
 import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Timing, WorldRecording } from "@towerai/contracts";
+import type { Message, Timing, WorldRecording } from "@towerai/contracts";
 import type { ElevenLabs } from "../agents/client";
-import { cachedLine, voiceLine, type Line, type VoicedLine } from "./voice";
+import { cachedLine, voiceFor, voiceLine, type Line, type VoicedLine } from "./voice";
 
 const WORLD = fileURLToPath(new URL("../../../world/data/world.json", import.meta.url));
 
@@ -13,9 +13,19 @@ export interface WorldVoiceResult {
   message?: string;
 }
 
+/** Who says a World line, and so in which voice. */
+export function worldLine(flightId: string, m: Message): Line {
+  if (m.from === "operator") return { role: "standIn", speaker: m.speaker, text: m.text };
+  // A responder is not the controller, so it does not get the controller's voice.
+  const responder = m.speaker.endsWith("(simulated)");
+  if (responder && voiceFor("pilot", m.speaker) === voiceFor("pilot", flightId)) return { role: "standIn", speaker: m.speaker, text: m.text };
+  const role = m.from === "pilot" || responder ? "pilot" : "controller";
+  return { role, speaker: responder ? m.speaker : flightId, text: m.text };
+}
+
 let recording: { changed: number; lines: Map<string, Line> } | undefined;
 
-/** Every line that may be voiced, with the voices record-world.ts gave them. */
+/** Every line that may be voiced. */
 function recordedLines(): Map<string, Line> {
   const changed = statSync(WORLD).mtimeMs;
   if (recording?.changed === changed) return recording.lines;
@@ -24,10 +34,8 @@ function recordedLines(): Map<string, Line> {
   for (const { summary, messages } of world.flights) {
     for (const m of messages) {
       // A line the validator stopped was never said.
-      if (m.from === "operator" || !m.text || (m.decision?.verdict === "rejected" && m.durationS === 0)) continue;
-      const responder = m.speaker.endsWith("(simulated)");
-      const role = m.from === "pilot" || responder ? "pilot" : "controller";
-      lines.set(`${summary.id}\n${m.id}`, { role, speaker: responder ? m.speaker : summary.id, text: m.text });
+      if (!m.text || (m.decision?.verdict === "rejected" && m.durationS === 0)) continue;
+      lines.set(`${summary.id}\n${m.id}`, worldLine(summary.id, m));
     }
   }
   recording = { changed, lines };

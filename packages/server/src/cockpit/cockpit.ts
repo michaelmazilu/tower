@@ -799,8 +799,8 @@ export function createCockpit({ api = null }: { api?: ElevenLabs | null } = {}) 
   let timer: NodeJS.Timeout | null = null;
   let credits: { at: number; left: number | null } = { at: -Infinity, left: null };
 
+  /** A recorded line needs no key. Only a new one needs `api`. */
   async function addVoice(exchange: Exchange): Promise<void> {
-    if (!api) return;
     const started = performance.now();
     try {
       const line = { role: "controller" as const, speaker: "Toronto Tower", text: exchange.said, spoken: spokenFeet(exchange.said) };
@@ -820,7 +820,6 @@ export function createCockpit({ api = null }: { api?: ElevenLabs | null } = {}) 
   }
 
   function announce(from: Run, exchange: Exchange): void {
-    if (!api) return;
     const started = performance.now();
     void addVoice(exchange).then(() => {
       if (from === run) exchange.timings.totalMs = Math.round(performance.now() - started);

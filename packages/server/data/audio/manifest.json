@@ -1332,8 +1332,8 @@
     "voice": "George",
     "model": "eleven_flash_v2_5",
     "characters": 48,
-    "firstByteMs": 201,
-    "recordedAt": "2026-11-22T18:45:13.283Z"
+    "firstByteMs": 165,
+    "recordedAt": "2026-11-22T19:22:25.062Z"
   },
   "b7f85512e3a5a2b3766e89d3.mp3": {
     "text": "Cleared ILS runway 2 3, wilco, Air Canada 1 0 3 8.",
@@ -8476,8 +8476,8 @@
     "voice": "Eric",
     "model": "eleven_flash_v2_5",
     "characters": 46,
-    "firstByteMs": 161,
-    "recordedAt": "2026-11-22T18:46:33.903Z"
+    "firstByteMs": 327,
+    "recordedAt": "2026-11-22T19:27:33.575Z"
   },
   "925d43063261f9b399594517.mp3": {
     "text": "Climb to flight level 2 4 0, All Nippon 1 0 6.",
@@ -11788,8 +11788,8 @@
     "voice": "Brian",
     "model": "eleven_flash_v2_5",
     "characters": 39,
-    "firstByteMs": 156,
-    "recordedAt": "2026-11-22T18:47:08.261Z"
+    "firstByteMs": 203,
+    "recordedAt": "2026-11-22T19:22:24.049Z"
   },
   "6f4c7f4fdb6f5010c01ee5d4.mp3": {
     "text": "Qantas 1 4 5, NZWN reports wind 3 0 0 at niner, visibility 1 0 kilometres, scattered 4 thousand feet.",
@@ -13204,8 +13204,8 @@
     "voice": "Eric",
     "model": "eleven_flash_v2_5",
     "characters": 44,
-    "firstByteMs": 157,
-    "recordedAt": "2026-11-22T18:47:22.447Z"
+    "firstByteMs": 173,
+    "recordedAt": "2026-11-22T19:27:33.928Z"
   },
   "d8731144ff1120c4bbe61e4f.mp3": {
     "text": "Copied, will call if we need to deviate, Air France niner 4 6.",
@@ -13958,5 +13958,557 @@
     "characters": 49,
     "firstByteMs": 213,
     "recordedAt": "2026-11-22T18:47:30.540Z"
+  },
+  "7eab1dc80086ebc54ba3080e.mp3": {
+    "text": "Air France 0 8 3, supervisor on frequency, I have you, stand by.",
+    "voice": "Daniel",
+    "model": "eleven_flash_v2_5",
+    "characters": 64,
+    "firstByteMs": 210,
+    "recordedAt": "2026-11-22T19:05:47.858Z"
+  },
+  "7e34571d253814cda09852c5.mp3": {
+    "text": "Qatari 7 2 1, supervisor on frequency, I have you, stand by.",
+    "voice": "Daniel",
+    "model": "eleven_flash_v2_5",
+    "characters": 60,
+    "firstByteMs": 214,
+    "recordedAt": "2026-11-22T19:05:47.901Z"
+  },
+  "58e49d617f99d208316c384d.mp3": {
+    "text": "Air France 0 8 3, departures are stopped, leave the orbit, proceed for runway 2 6 right, priority approach.",
+    "voice": "Daniel",
+    "model": "eleven_flash_v2_5",
+    "characters": 107,
+    "firstByteMs": 214,
+    "recordedAt": "2026-11-22T19:05:47.922Z"
+  },
+  "ea4d4c29356f1010764b06df.mp3": {
+    "text": "Qatari 7 2 1, diversion approved, proceed direct Dubai, descend to flight level 2 0 0, full length runway 3 0 left.",
+    "voice": "Daniel",
+    "model": "eleven_flash_v2_5",
+    "characters": 115,
+    "firstByteMs": 208,
+    "recordedAt": "2026-11-22T19:05:48.269Z"
+  },
+  "01a297fc6cf5710f1ae98809.mp3": {
+    "text": "Air Canada 7, Toronto Tower, I have you at gate 1 7 8, both engines normal. Next, say: request pushback.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 104,
+    "firstByteMs": 204,
+    "recordedAt": "2026-11-22T18:53:36.455Z"
+  },
+  "8f9212603f8e78cb78cf7e72.mp3": {
+    "text": "Air Canada 7, good to hear, and your data agrees.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 49,
+    "firstByteMs": 153,
+    "recordedAt": "2026-11-22T19:05:49.151Z"
+  },
+  "94c9a4396e6169e91f5d18bc.mp3": {
+    "text": "Air Canada 7, pushback approved, it's clear behind you. Now say: pushback approved.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 83,
+    "firstByteMs": 172,
+    "recordedAt": "2026-11-22T19:05:49.371Z"
+  },
+  "bf9c74f1db492834bd53c845.mp3": {
+    "text": "Air Canada 7, I hear you. I show you stationary on the ground, 0 knots, both engines normal. You haven't taken off. What do you see? Say everything is fine, or send help.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 170,
+    "firstByteMs": 166,
+    "recordedAt": "2026-11-22T19:05:49.813Z"
+  },
+  "8be8f08a21c73430bc8f2cd8.mp3": {
+    "text": "Air Canada 7, readback correct. Pushing you back. Ask me to taxi when you stop.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 79,
+    "firstByteMs": 715,
+    "recordedAt": "2026-11-22T19:05:50.000Z"
+  },
+  "65bdc2a1d7902a47605d010d.mp3": {
+    "text": "Air Canada 7, taxi to runway 2 4 left, hold short of runway 2 4 right. Follow the line. Read that back.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 103,
+    "firstByteMs": 394,
+    "recordedAt": "2026-11-22T19:05:50.218Z"
+  },
+  "e073739984ee5201f3673f45.mp3": {
+    "text": "Air Canada 7, readback correct. Off you go. I'm watching every turn.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 68,
+    "firstByteMs": 176,
+    "recordedAt": "2026-11-22T19:05:50.240Z"
+  },
+  "2a072d1a95e4f1d77a811041.mp3": {
+    "text": "Air Canada 7, almost. I need hold short runway 2 4 right. Say: Taxi to runway 2 4 left, hold short runway 2 4 right.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 116,
+    "firstByteMs": 291,
+    "recordedAt": "2026-11-22T19:05:50.348Z"
+  },
+  "1432881c5157745973a1d6d1.mp3": {
+    "text": "Air Canada 7, readback correct. Cross now. Your runway is next.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 63,
+    "firstByteMs": 161,
+    "recordedAt": "2026-11-22T19:05:50.465Z"
+  },
+  "ce5b04d5ad74d6fa4289903d.mp3": {
+    "text": "Air Canada 7, nobody's on it, cross runway 2 4 right. Now say: cross runway 2 4 right.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 86,
+    "firstByteMs": 174,
+    "recordedAt": "2026-11-22T19:05:50.477Z"
+  },
+  "16493f6750718def9d1d7a07.mp3": {
+    "text": "Air Canada 7, roger mayday, I see left engine at 0. Responders and a human controller alerted. I'll give you the turn back once you're climbing.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 144,
+    "firstByteMs": 169,
+    "recordedAt": "2026-11-22T19:05:50.648Z"
+  },
+  "a966933770e174c8df4085de.mp3": {
+    "text": "Change to runway 2 4 left, Encore 3 4 1 2.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 42,
+    "firstByteMs": 218,
+    "recordedAt": "2026-11-22T19:06:13.831Z"
+  },
+  "455e5e23a4f884e747d6ed08.mp3": {
+    "text": "Change to runway 2 4 left, Air France 3 5 6.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 44,
+    "firstByteMs": 227,
+    "recordedAt": "2026-11-22T19:06:13.842Z"
+  },
+  "69da97657f1b2b2135e66269.mp3": {
+    "text": "Encore 3 4 1 2, runway 2 4 right not available, change to runway 2 4 left.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 74,
+    "firstByteMs": 220,
+    "recordedAt": "2026-11-22T19:06:13.853Z"
+  },
+  "b02bfe9283f7ea6f69cbd939.mp3": {
+    "text": "1 3 2 souls, 3 hours of fuel, United 1 1 niner.",
+    "voice": "Matilda",
+    "model": "eleven_flash_v2_5",
+    "characters": 47,
+    "firstByteMs": 154,
+    "recordedAt": "2026-11-22T19:06:14.059Z"
+  },
+  "d15883f0701952aa33fd0677.mp3": {
+    "text": "Approach, Lufthansa 4 7 1, niner mile final runway 2 3.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 55,
+    "firstByteMs": 158,
+    "recordedAt": "2026-11-22T19:06:14.099Z"
+  },
+  "7760fc977ef61c6710bca582.mp3": {
+    "text": "United 1 1 niner, when able, say souls on board and fuel.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 57,
+    "firstByteMs": 173,
+    "recordedAt": "2026-11-22T19:06:14.146Z"
+  },
+  "df1e78907467cd8891a651e7.mp3": {
+    "text": "Porter 2 4 5, cross runway 2 4 right.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 37,
+    "firstByteMs": 152,
+    "recordedAt": "2026-11-22T19:06:14.308Z"
+  },
+  "92e4b5bc10f9bf0d9778ccd0.mp3": {
+    "text": "Tower, Porter 2 4 5, holding short runway 2 4 right, request crossing.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 70,
+    "firstByteMs": 166,
+    "recordedAt": "2026-11-22T19:06:14.316Z"
+  },
+  "81d190a43b7b7b518eeb4c8a.mp3": {
+    "text": "Cross runway 2 4 right, Porter 2 4 5.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 37,
+    "firstByteMs": 173,
+    "recordedAt": "2026-11-22T19:06:14.378Z"
+  },
+  "61b4d223706ca85db4128f88.mp3": {
+    "text": "WestJet 3 0 2, contact Toronto Departure, 1 2 8 decimal 8.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 58,
+    "firstByteMs": 172,
+    "recordedAt": "2026-11-22T19:06:14.569Z"
+  },
+  "a4fc2066470def01c7b25e3d.mp3": {
+    "text": "Approach, Lufthansa 4 7 1, niner mile final runway 2 3, still waiting.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 70,
+    "firstByteMs": 174,
+    "recordedAt": "2026-11-22T19:06:14.583Z"
+  },
+  "bcd4538e8a22db1b6ba96e59.mp3": {
+    "text": "Tower, Jazz 7 8 1, holding short runway 2 3, ready for departure.",
+    "voice": "Sarah",
+    "model": "eleven_flash_v2_5",
+    "characters": 65,
+    "firstByteMs": 505,
+    "recordedAt": "2026-11-22T19:08:22.206Z"
+  },
+  "e9c877894dbd51cb11a768a8.mp3": {
+    "text": "Lufthansa 4 7 1, runway 2 3, cleared to land.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 45,
+    "firstByteMs": 620,
+    "recordedAt": "2026-11-22T19:08:22.321Z"
+  },
+  "8199cca1cbb2d535cd401356.mp3": {
+    "text": "1 2 8 decimal 8, WestJet 3 0 2.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 31,
+    "firstByteMs": 663,
+    "recordedAt": "2026-11-22T19:08:22.361Z"
+  },
+  "aee8f5b79ab38a4949dc26d9.mp3": {
+    "text": "Jazz 7 8 1, hold short runway 2 3.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 34,
+    "firstByteMs": 355,
+    "recordedAt": "2026-11-22T19:08:22.723Z"
+  },
+  "72405bab95f0766d690357ef.mp3": {
+    "text": "Hold short runway 2 3, Jazz 7 8 1.",
+    "voice": "Sarah",
+    "model": "eleven_flash_v2_5",
+    "characters": 34,
+    "firstByteMs": 331,
+    "recordedAt": "2026-11-22T19:08:22.757Z"
+  },
+  "6db0a30e87392fdaeae13480.mp3": {
+    "text": "Runway 2 3, cleared to land, Lufthansa 4 7 1.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 45,
+    "firstByteMs": 392,
+    "recordedAt": "2026-11-22T19:08:22.802Z"
+  },
+  "67aef801df330f3060ff5366.mp3": {
+    "text": "Lufthansa 4 7 1, contact Toronto Tower, 1 1 8 decimal 7.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 56,
+    "firstByteMs": 333,
+    "recordedAt": "2026-11-22T19:08:23.078Z"
+  },
+  "e36759e430a9e0d0c223bfad.mp3": {
+    "text": "Approach, K L M 6 niner 1, 1 4 mile final runway 2 3.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 53,
+    "firstByteMs": 482,
+    "recordedAt": "2026-11-22T19:08:23.261Z"
+  },
+  "fef619438e949af71b3ef015.mp3": {
+    "text": "1 1 8 decimal 7, Lufthansa 4 7 1.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 33,
+    "firstByteMs": 454,
+    "recordedAt": "2026-11-22T19:08:23.530Z"
+  },
+  "9878e194fd9981312c9dd3f6.mp3": {
+    "text": "United 1 1 niner, runway 2 4 left, cleared to land.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 51,
+    "firstByteMs": 266,
+    "recordedAt": "2026-11-22T19:08:23.546Z"
+  },
+  "6b2481b141910a86b8f71eca.mp3": {
+    "text": "Tower, United 1 1 niner, 2 mile final runway 2 4 left.",
+    "voice": "Matilda",
+    "model": "eleven_flash_v2_5",
+    "characters": 54,
+    "firstByteMs": 305,
+    "recordedAt": "2026-11-22T19:08:23.695Z"
+  },
+  "8c961cc745f1c80765587486.mp3": {
+    "text": "Runway 2 4 left, cleared to land, United 1 1 niner.",
+    "voice": "Matilda",
+    "model": "eleven_flash_v2_5",
+    "characters": 51,
+    "firstByteMs": 458,
+    "recordedAt": "2026-11-22T19:08:24.031Z"
+  },
+  "664bd78fd5c95445ac190630.mp3": {
+    "text": "Approach, K L M 6 niner 1, 1 3 mile final runway 2 3.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 53,
+    "firstByteMs": 469,
+    "recordedAt": "2026-11-22T19:11:46.145Z"
+  },
+  "3f4ece93259495fd92a96946.mp3": {
+    "text": "Delta 4 8 2, taxi to gate Bravo 1 1 via Delta 2, Charlie, Bravo, Delta, Alfa, Alfa Lima.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 88,
+    "firstByteMs": 484,
+    "recordedAt": "2026-11-22T19:11:46.172Z"
+  },
+  "d701a035e02c2ff4ff481762.mp3": {
+    "text": "Ground, Delta 4 8 2, clear of the runway, request taxi to gate Bravo 1 1.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 73,
+    "firstByteMs": 474,
+    "recordedAt": "2026-11-22T19:11:46.293Z"
+  },
+  "afb8400a3b452c43adbaf6e4.mp3": {
+    "text": "Taxi to gate Bravo 1 1 via Delta 2, Charlie, Bravo, Delta, Alfa, Alfa Lima, Delta 4 8 2.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 88,
+    "firstByteMs": 250,
+    "recordedAt": "2026-11-22T19:11:46.481Z"
+  },
+  "486b22e80ee3b519ff15d8b4.mp3": {
+    "text": "Approach, Air France 3 5 6, 1 0 mile final runway 2 4 left.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 59,
+    "firstByteMs": 210,
+    "recordedAt": "2026-11-22T19:11:46.519Z"
+  },
+  "41ca424957cfc0014a3bcb93.mp3": {
+    "text": "United 1 1 niner, traffic, 2 o'clock, 4 miles, A 3 3 0, 2 thousand feet.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 72,
+    "firstByteMs": 303,
+    "recordedAt": "2026-11-22T19:11:46.713Z"
+  },
+  "842df4e06c665035a66c34ff.mp3": {
+    "text": "Air France 3 5 6, continue approach runway 2 4 left.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 52,
+    "firstByteMs": 233,
+    "recordedAt": "2026-11-22T19:11:46.729Z"
+  },
+  "90ea659b602c514c90dbce23.mp3": {
+    "text": "Continue approach runway 2 4 left, Air France 3 5 6.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 52,
+    "firstByteMs": 214,
+    "recordedAt": "2026-11-22T19:11:46.774Z"
+  },
+  "4ed20da96843ecba1eda918b.mp3": {
+    "text": "Looking for traffic, United 1 1 niner.",
+    "voice": "Matilda",
+    "model": "eleven_flash_v2_5",
+    "characters": 38,
+    "firstByteMs": 246,
+    "recordedAt": "2026-11-22T19:11:46.975Z"
+  },
+  "f59b9ed57ff51d25daf452d2.mp3": {
+    "text": "Tower, Porter 2 4 5, holding short runway 2 4 left, ready for departure.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 72,
+    "firstByteMs": 228,
+    "recordedAt": "2026-11-22T19:11:46.998Z"
+  },
+  "a125626b696293f7e15ca504.mp3": {
+    "text": "Porter 2 4 5, hold short runway 2 4 left.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 41,
+    "firstByteMs": 162,
+    "recordedAt": "2026-11-22T19:22:25.275Z"
+  },
+  "5a5893b760371e82dc06d7f5.mp3": {
+    "text": "Hold short runway 2 4 left, Porter 2 4 5.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 41,
+    "firstByteMs": 173,
+    "recordedAt": "2026-11-22T19:11:47.259Z"
+  },
+  "23322f9757df29ad3e339bc8.mp3": {
+    "text": "Approach, Encore 3 4 1 2, 1 6 mile final runway 2 4 left.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 57,
+    "firstByteMs": 203,
+    "recordedAt": "2026-11-22T19:11:47.314Z"
+  },
+  "ec9aa365e751645261abe8ab.mp3": {
+    "text": "Over to Centre, WestJet 3 0 2.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 30,
+    "firstByteMs": 210,
+    "recordedAt": "2026-11-22T19:15:12.232Z"
+  },
+  "c6b2548490428e20e35ac623.mp3": {
+    "text": "WestJet 3 0 2, contact Toronto Centre, good day.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 48,
+    "firstByteMs": 211,
+    "recordedAt": "2026-11-22T19:15:12.272Z"
+  },
+  "ba68d90e5b0b6b76e2c0340d.mp3": {
+    "text": "Air France 3 5 6, contact Toronto Tower, 1 1 8 decimal 7.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 57,
+    "firstByteMs": 199,
+    "recordedAt": "2026-11-22T19:15:12.281Z"
+  },
+  "fbe73df246c9b8e98f92f5eb.mp3": {
+    "text": "1 1 8 decimal 7, Air France 3 5 6.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 34,
+    "firstByteMs": 163,
+    "recordedAt": "2026-11-22T19:15:12.459Z"
+  },
+  "8b6666dbea33a32a7e6436d0.mp3": {
+    "text": "Encore 3 4 1 2, continue approach runway 2 4 left.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 50,
+    "firstByteMs": 159,
+    "recordedAt": "2026-11-22T19:15:12.515Z"
+  },
+  "fe447f1086311ddc37cb8452.mp3": {
+    "text": "Continue approach runway 2 4 left, Encore 3 4 1 2.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 50,
+    "firstByteMs": 166,
+    "recordedAt": "2026-11-22T19:15:12.527Z"
+  },
+  "a22e4625f5bda9fcb21f00f6.mp3": {
+    "text": "Tower, Air France 3 5 6, 7 mile final runway 2 4 left.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 54,
+    "firstByteMs": 167,
+    "recordedAt": "2026-11-22T19:15:12.719Z"
+  },
+  "2f5fc0bae0d446ccb500dddf.mp3": {
+    "text": "Looking for traffic, Air Canada 2 1 4.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 38,
+    "firstByteMs": 162,
+    "recordedAt": "2026-11-22T19:15:12.756Z"
+  },
+  "46baad057e290783d267d537.mp3": {
+    "text": "Air Canada 2 1 4, traffic, 2 o'clock, 4 miles, 7 8 7, 3 thousand feet.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 70,
+    "firstByteMs": 169,
+    "recordedAt": "2026-11-22T19:15:12.774Z"
+  },
+  "da0f9bc74a9c28924d148841.mp3": {
+    "text": "Ground, Air Transat 3 3 0 at gate 1 6 4, request pushback.",
+    "voice": "Sarah",
+    "model": "eleven_flash_v2_5",
+    "characters": 58,
+    "firstByteMs": 139,
+    "recordedAt": "2026-11-22T19:15:12.940Z"
+  },
+  "133305c0eb347dbba8ab98d3.mp3": {
+    "text": "Tower, Lufthansa 4 7 1, 2 mile final runway 2 3, still waiting.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 63,
+    "firstByteMs": 163,
+    "recordedAt": "2026-11-22T19:15:13.039Z"
+  },
+  "fbfbba0afe1c6be10e9c622e.mp3": {
+    "text": "Approach, Encore 3 4 1 2, 1 4 mile final runway 2 4 left.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 57,
+    "firstByteMs": 198,
+    "recordedAt": "2026-11-22T19:15:13.057Z"
+  },
+  "f1bcfd18e1cea7ef21ad1897.mp3": {
+    "text": "Air Transat 3 3 0, pushback approved.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 37,
+    "firstByteMs": 168,
+    "recordedAt": "2026-11-22T19:15:13.163Z"
+  },
+  "798016e0c516b166c46a6204.mp3": {
+    "text": "Pushback approved, Air Transat 3 3 0.",
+    "voice": "Sarah",
+    "model": "eleven_flash_v2_5",
+    "characters": 37,
+    "firstByteMs": 145,
+    "recordedAt": "2026-11-22T19:15:13.245Z"
+  },
+  "82b9f518fd336a946ab665cd.mp3": {
+    "text": "1 1 8 decimal 7, K L M 6 niner 1.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 33,
+    "firstByteMs": 218,
+    "recordedAt": "2026-11-22T19:15:34.608Z"
+  },
+  "d24a18e061c74bdab8da0b26.mp3": {
+    "text": "K L M 6 niner 1, contact Toronto Tower, 1 1 8 decimal 7.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 56,
+    "firstByteMs": 232,
+    "recordedAt": "2026-11-22T19:15:34.616Z"
+  },
+  "9aca05c02506073966f53f50.mp3": {
+    "text": "Tower, Air France 3 5 6, 8 mile final runway 2 4 left.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 54,
+    "firstByteMs": 214,
+    "recordedAt": "2026-11-22T19:24:18.336Z"
+  },
+  "37db910dca96822b02f1d3c1.mp3": {
+    "text": "Fire and Ambulance Control copies, All Nippon 8 6 1, runway 3 4 left, units responding to standby positions.",
+    "voice": "Daniel",
+    "model": "eleven_flash_v2_5",
+    "characters": 108,
+    "firstByteMs": 202,
+    "recordedAt": "2026-11-22T19:31:59.602Z"
   }
 }

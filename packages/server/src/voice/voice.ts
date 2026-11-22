@@ -11,6 +11,8 @@ const FORMAT = "mp3_22050_32";
 const SETTINGS = { speed: 1.12, stability: 0.6, similarity_boost: 0.7 };
 /** ElevenLabs premade voices. */
 const CONTROLLER = { id: "cjVigY5qzO86Huf0OWal", name: "Eric" };
+/** Supervisors, and a responder who would sound like the crew. Never a controller or pilot voice. */
+const STAND_IN = { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel" };
 const PILOTS = [
   { id: "nPczCjzI2devNBz1zQrb", name: "Brian" },
   { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda" },
@@ -20,7 +22,7 @@ const PILOTS = [
 ];
 
 export interface Line {
-  role: "controller" | "pilot";
+  role: "controller" | "pilot" | "standIn";
   /** Picks the pilot's voice. Use the callsign so a flight keeps its voice. */
   speaker: string;
   text: string;
@@ -50,6 +52,7 @@ const LIVE = dataPath("audio", "live");
 /** All pilot lines of one flight map to one voice. */
 export function voiceFor(role: Line["role"], speaker: string) {
   if (role === "controller") return CONTROLLER;
+  if (role === "standIn") return STAND_IN;
   let hash = 0;
   for (const c of speaker.toUpperCase()) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
   return PILOTS[hash % PILOTS.length];

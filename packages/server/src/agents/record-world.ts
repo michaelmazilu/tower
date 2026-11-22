@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { AgentPrompt, AskAgent, Timing } from "@towerai/contracts";
 import { recordWorld } from "@towerai/world";
 import { cachedLine, voiceLine, type Line, type VoicedLine } from "../voice/voice";
+import { worldLine } from "../voice/worldVoice";
 import { createAskAgent } from "./ask";
 import { ElevenLabs, SpendLimitError } from "./client";
 import { dataPath, readData, writeData } from "./data";
@@ -101,11 +102,7 @@ const attach = (m: Message, voiced: VoicedLine) => {
 const wanted = new Map<string, { line: Line; messages: Message[] }>();
 for (const { summary, messages } of world.flights) {
   for (const m of messages) {
-    if (m.from === "operator") continue;
-    // A responder is not the controller, so it does not get the controller's voice.
-    const responder = m.speaker.endsWith("(simulated)");
-    const role = m.from === "pilot" || responder ? "pilot" : "controller";
-    const line: Line = { role, speaker: responder ? m.speaker : summary.id, text: m.text };
+    const line = worldLine(summary.id, m);
     const voiced = cachedLine(line, true);
     if (voiced) {
       attach(m, voiced);
