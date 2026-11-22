@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FlightRecord, FlightSummary, OpsState } from "@towerai/contracts";
 import { FlightDetail } from "../shared/FlightDetail";
-import { byUrgency, clock, flightAt, needsHuman, separationAt } from "../shared/replay";
+import { byUrgency, clock, flightAt, needsHuman, respondersAt, separationAt } from "../shared/replay";
 import type { Sound } from "../shared/sound";
 import { AirportMap } from "./AirportMap";
 import { FlightGrid } from "./FlightGrid";
@@ -142,7 +142,10 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
   // Everything else waits, counted, and comes back when they hand back or close the flight.
   const focused = summary?.attention === "human_control" && !replaying;
   const unseen = ops.alerts.filter((a) => !a.acknowledged);
+  // The open flight's card already says what its alerts say; the banner is for the rest of the airport.
+  const briefed = !replaying && summary?.brief ? summary.id : null;
   const alert = unseen
+    .filter((a) => a.flightId !== briefed || !a.flightId)
     .filter((a) => a.level === "critical" || !focused)
     .sort((a, b) => SEVERITY[b.level] - SEVERITY[a.level] || b.t - a.t);
   const heldAlerts = focused ? unseen.filter((a) => a.level !== "critical" && a.level !== "normal").length : 0;
@@ -203,7 +206,7 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
               onClose={() => select(null)}
               nameOf={nameOf}
               action={summary && <TakeOverKey flight={summary} operator={operator} />}
-              briefing={!replaying && summary?.brief ? <NeedsYou flight={summary} operator={operator} heldAlerts={heldAlerts} messages={record?.messages ?? NO_MESSAGES} /> : undefined}
+              briefing={!replaying && summary?.brief ? <NeedsYou flight={summary} operator={operator} heldAlerts={heldAlerts} messages={record?.messages ?? NO_MESSAGES} responders={stored ? respondersAt(stored, t) : null} /> : undefined}
               controls={!replaying && summary && <OperatorPanel flight={summary} operator={operator} />}
             />
           ) : (

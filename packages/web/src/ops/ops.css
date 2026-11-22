@@ -239,10 +239,25 @@
 .ask-now ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.4; }
 .ask-do { border-bottom: var(--line); }
 .ask-note { margin: 8px 0 0 !important; font-size: 12px !important; color: var(--grey-600); }
-.ask-radio { flex: 1 1 auto; min-height: 120px; display: flex; flex-direction: column; border-top: var(--line); }
-.ask-radio > small { flex: none; padding: 8px 16px 6px; margin: 0; }
-.ask-radio > small span { margin-left: 8px; font-weight: 400; color: var(--grey-400); }
-.ask-radio ol { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0 16px 10px; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.ask-radio { display: flex; flex-direction: column; border-top: var(--line); }
+.ask-radio-head { flex: none; padding: 8px 16px 6px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ask-radio-head small { margin: 0; }
+.ask-radio-head button { padding: 0; border: 0; background: none; color: var(--black); font: 700 13px var(--sans); text-decoration: underline; cursor: pointer; }
+.ask-radio ol { margin: 0; padding: 0 16px 12px; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.ask-radio-full { position: relative; flex: 1 1 auto; min-height: 0; border-top: 0; }
+.ask-radio-full ol { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-top: 4px; }
+.ask-radio-full .ask-msg { max-width: 92%; padding: 8px 12px; }
+.ask-radio-full .ask-msg p { font-size: 15px; line-height: 1.4; }
+.ask-radio-full .ask-msg div { font-size: 12px; }
+.ask-msg-why { margin-top: 4px !important; font-size: 12px !important; color: var(--grey-600); }
+.ask-msg-you .ask-msg-why { color: var(--grey-200); }
+.ask-radio-jump { position: absolute; right: 16px; bottom: 12px; height: 32px; padding: 0 12px; border: 0; background: var(--black); color: var(--white); font: 700 12px var(--sans); cursor: pointer; }
+.fd > .ask.ask-radio-mode { overflow: hidden; }
+.ask-tabs { flex: none; display: flex; border-bottom: var(--line); background: var(--white); }
+.ask-tabs button { flex: 1; height: 38px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--grey-600); font: 700 13px var(--sans); cursor: pointer; }
+.ask-tabs button[aria-selected="true"] { color: var(--black); border-bottom-color: var(--black); }
+.ask-tabs button:hover { color: var(--black); }
+.ask-tabs span { margin-left: 6px; padding: 1px 6px; background: var(--grey-100); font: 11px var(--mono); }
 .ask-radio-empty { font-size: 13px; color: var(--grey-600); }
 .ask-msg { max-width: 86%; padding: 6px 10px; border: 1px solid var(--grey-200); background: var(--white); }
 .ask-msg div { display: flex; gap: 8px; align-items: baseline; font-size: 11px; color: var(--grey-600); }
@@ -255,3 +270,30 @@
 .ask-msg-you { align-self: flex-end; background: var(--black); border-color: var(--black); }
 .ask-msg-you div, .ask-msg-you b, .ask-msg-you p, .ask-msg-you button { color: var(--white); }
 .ask-wait { font-weight: 700; }
+.ask-around { padding: 8px 16px 10px; border-bottom: var(--line); }
+.ask-around p { margin: 2px 0 0; font-size: 13px; line-height: 1.35; }
+.ask-around p small { display: inline; margin: 0 8px 0 0; }
+.ask-line { display: block; width: 100%; max-width: 520px; height: auto; }
+.ask-line-path { stroke: var(--grey-400); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.ask-line-runway { fill: var(--black); }
+.ask-line-abort { stroke: var(--red); stroke-width: 2; }
+.ask-line-other { fill: var(--white); stroke: var(--grey-600); stroke-width: 1.5; }
+.ask-line-me { fill: var(--red); }
+.ask-line-label { font: 700 12px var(--mono); fill: var(--black); }
+.ask-line-note { font: 10px var(--sans); fill: var(--grey-600); }
+.ask-line-red { fill: var(--red); }
+.ask-story { padding: 8px 16px 10px; border-top: var(--line); }
+.ask-story ol { margin: 0; padding: 0; list-style: none; }
+.ask-story li { display: flex; gap: 10px; font-size: 13px; line-height: 1.45; }
+.ask-story time { flex: none; width: 38px; font: 12px/1.6 var(--mono); color: var(--grey-600); }
+/* Narrow panel: the clock goes under the headline instead of squeezing it. */
+.fd > .ask { container-type: inline-size; }
+@container (max-width: 440px) {
+  .ask-top { flex-direction: column; }
+  .ask-clock { width: auto; flex-direction: row; align-items: baseline; gap: 10px; border-left: 0; border-top: 1px solid rgb(255 255 255 / 0.35); padding: 8px 16px; }
+  .ask-clock b { font-size: 24px; }
+  .ask-keys { flex-direction: column; }
+}
+.box-need-plain::before { content: none; }
+.box-need-plain { font-weight: 700; }
+.ask-responders { font-weight: 700; }

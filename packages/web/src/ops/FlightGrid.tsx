@@ -1,5 +1,5 @@
 import type { FlightSummary } from "@towerai/contracts";
-import { ATTENTION_WORDS, needsHuman } from "../shared/replay";
+import { needsHuman } from "../shared/replay";
 import { useSteadyOrder } from "../shared/useSteadyOrder";
 
 const MIN_BOXES = 9;
@@ -7,10 +7,14 @@ const MIN_BOXES = 9;
 const DENSE_PAST = 12;
 /** Four rows of four. The quietest of any more fold into one row of callsigns. */
 const MOST_BOXES = 16;
-const STEPS = { normal: 1, watch: 2, high: 3, critical: 4 };
-
-/** Nothing to say beyond "the agent has it". */
-const quiet = (f: FlightSummary) => f.attention === "none" && f.risk.level === "normal" && !f.need;
+/** One word at the foot, only when it asks something of the person. The agent's own flights say nothing. */
+const FOOT: Record<FlightSummary["attention"], string | null> = {
+  human_requested: "pilot asked for you",
+  intervene: "needs you",
+  human_control: "you have it",
+  monitor: null,
+  none: null,
+};
 
 function boxClass(f: FlightSummary) {
   if (needsHuman(f.attention)) return "box box-human";
@@ -32,23 +36,16 @@ export function FlightGrid({ flights, onSelect }: { flights: FlightSummary[]; on
     <div className="fleet" {...hold}>
     <div className={`grid ${dense ? "grid-dense" : boxes.length <= MIN_BOXES ? "grid-roomy" : ""}`} style={{ gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}>
       {boxes.map((f) => (
-        <button key={f.id} className={boxClass(f)} onClick={() => onSelect(f.id)}>
-          <span className="box-top">
-            <b>{f.callsign}</b>
-            <span className="box-risk-value" title={f.risk.reasons.join(", ")}>
-              <span>{Math.round(f.risk.score)}</span>
-              <i className="meter">
-                {[1, 2, 3, 4].map((n) => <i key={n} className={n <= STEPS[f.risk.level] ? "meter-on" : ""} />)}
-              </i>
-            </span>
-          </span>
+        <button key={f.id} className={boxClass(f)} onClick={() => onSelect(f.id)} title={f.risk.reasons.join(", ") || undefined}>
+          <span className="box-top"><b>{f.callsign}</b></span>
           <strong className="box-status">{f.status}</strong>
-          <span className={`box-who ${f.need ? "box-who-second" : ""}`}>{f.attention === "human_control" ? "human operator" : f.facility}</span>
-          {f.need && <span className="box-need">{f.need}</span>}
-          <span className={`box-said ${f.need ? "box-said-short" : quiet(f) ? "box-said-quiet" : ""}`}>{f.lastMessage ? `“${f.lastMessage}”` : "no radio contact yet"}</span>
-          <span className={`box-foot ${quiet(f) ? "box-foot-quiet" : ""}`}>
-            {f.attention === "none" && f.risk.level !== "normal" ? `${f.risk.level} risk` : ATTENTION_WORDS[f.attention]}
-          </span>
+          {f.brief ? (
+            <span className="box-need box-need-plain">{f.brief.problem}</span>
+          ) : (
+            f.need && <span className="box-need">{f.need}</span>
+          )}
+          {f.lastMessage && !f.brief && <span className={`box-said ${f.need ? "box-said-short" : ""}`}>“{f.lastMessage}”</span>}
+          {FOOT[f.attention] && <span className="box-foot">{FOOT[f.attention]}</span>}
         </button>
       ))}
       {Array.from({ length: empty }, (_, i) => <div key={`empty-${i}`} className="box-empty" />)}

@@ -99,6 +99,12 @@ describe("live operations", () => {
     expect(before.now).toEqual(["The agent is still handling DLH471 until you take over.", "It is not cleared to land yet."]);
     expect(before.recommend.map((r) => r.label)).toEqual(["Give it priority to land on 23", "Call paramedics to gate 173"]);
     expect(before.onHandback).toBeNull();
+    expect(before.approach).toMatchObject({ runway: "23", decisionNm: 1 });
+    expect(before.around).toMatch(/^Nothing is ahead of it to runway 23\./);
+    expect(before.story.map((x) => x.text)).toEqual([
+      "Pilot reported a passenger medical emergency and asked for a person",
+      "Agent told the pilot to stand by for a person",
+    ]);
 
     // Approval is for what was on screen, nothing else.
     expect(host.ops.accept("DLH471", ["ALERT_MEDICAL"]).ok).toBe(false);
@@ -108,6 +114,8 @@ describe("live operations", () => {
     expect(accepted).toMatchObject({ ok: true, message: expect.stringMatching(/^You have DLH471\. Sent: .*number one.*Paramedics/) });
     const after = brief();
     expect(after.recommend).toEqual([]);
+    // The story lists only what has been said; the two calls are still waiting for the frequency.
+    expect(after.story.at(-1)?.text).toBe("You took over");
     expect(after.now).toEqual([
       "You are in control. The agent will not talk to DLH471.",
       "It has priority to land on runway 23.",
@@ -127,12 +135,12 @@ describe("live operations", () => {
     expect(brief("WJA302")).toMatchObject({
       problem: "On runway 23 without permission",
       context: "ACA214 is coming in to land on that runway, 2 miles out.",
-      agentDoing: { text: "telling WJA302 to stop where it is", cancelledByTakeover: true },
+      agentDoing: { text: "The agent is already telling WJA302 to stop where it is.", cancelledByTakeover: true },
     });
     expect(brief("ACA214")).toMatchObject({
       problem: "Its runway is blocked",
       context: expect.stringMatching(/^WJA302 is on runway 23\. ACA214 is \d+ miles out/),
-      agentDoing: { text: "telling ACA214 to abort the landing and climb away" },
+      agentDoing: { text: "The agent is already telling ACA214 to abort the landing and climb away." },
     });
     for (const id of ["WJA302", "ACA214"]) expect(JSON.stringify(brief(id))).not.toMatch(/reserved|05\/23|NM/);
   });
@@ -145,7 +153,8 @@ describe("live operations", () => {
       const ac = host.sim.get("UAL119");
       if (ac?.flags.emergencyReturn && ac.phase === "go_around") context = host.opsState().flights.find((f) => f.id === "UAL119")?.brief?.context;
     }
-    expect(context).toMatch(/Turning back to land/);
+    expect(context).toMatch(/turning back to land/i);
+    expect(context).not.toMatch(/aborted/i);
   });
 
   it("does not swap the arrival and the aircraft in its way", () => {
@@ -161,6 +170,27 @@ describe("live operations", () => {
     const card = (host.ops as any).runwayConflict(blocker, 1, 1);
     expect(card.context).toMatch(/^DAL482 is coming in to land/);
     expect((host.ops as any).runwayConflict(arrival, 1, 1).context).toMatch(/^UAL119 is on runway/);
+  });
+
+  it("says the mayday plainly, keeps other flights out of the closure, and says when the agent has it handled", () => {
+    const host = demo();
+    host.stepOnce(1250);
+    const ual = host.opsState().flights.find((f) => f.id === "UAL119")!.brief!;
+    expect(ual.problem).toBe("Engine failure after takeoff");
+    expect(ual.context).toMatch(/^It is turning back to land on runway 24L\. Now \d+ miles from runway 24L, at [\d,]+ ft\.$/);
+    expect(ual.agentDoing?.text).toMatch(/^The agent (is already telling|has told) UAL119 to come straight back to land/);
+    for (const id of ["UAL119", "DLH471"]) {
+      expect(host.opsState().flights.find((f) => f.id === id)!.brief!.story.map((x) => x.text).join(" ")).not.toMatch(/closed/);
+    }
+  });
+
+  it("tells the story in plain words once the calls are on air", () => {
+    const host = demo();
+    host.stepOnce(450);
+    host.ops.accept("DLH471", ["PRIORITY_LANDING", "ALERT_MEDICAL"]);
+    host.stepOnce(150);
+    const story = host.opsState().flights.find((f) => f.id === "DLH471")!.brief!.story.map((x) => x.text);
+    expect(story.slice(-3)).toEqual(["You took over", "You gave it priority to land on 23", "You called paramedics to gate 173"]);
   });
 
   it("warns before handback when help the agent will not call has not been called", () => {

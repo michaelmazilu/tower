@@ -355,6 +355,76 @@ export class Ops {
     return steps;
   }
 
+  /** Where it is on the way in, who else is landing on that runway, and whether the runway is clear. */
+  private surroundings(ac: Aircraft): Pick<HandoffBrief, "approach" | "around"> {
+    const { sim } = this;
+    const runway = ac.assignedRunway;
+    const end = runway ? sim.graph.runwayEnd(runway) : undefined;
+    if (!runway || !end || (ac.phase !== "approach" && ac.phase !== "landing")) return { approach: null, around: null };
+    const physical = end.runway.id;
+    const inbound = inboundArrivals(sim, physical);
+    const mine = inbound.findIndex((x) => x.aircraft.id === ac.id);
+    const miles = distanceToThreshold(sim, ac) / NM;
+    const others = inbound
+      .filter((x) => x.aircraft.id !== ac.id && x.distanceNm < Math.max(miles * 1.6, 8))
+      .map((x) => ({ callsign: x.aircraft.callsign, miles: tidy(x.distanceNm, 1) }));
+    const parts: string[] = [];
+    const ahead = mine > 0 ? inbound[mine - 1] : undefined;
+    const behind = mine >= 0 ? inbound[mine + 1] : undefined;
+    parts.push(ahead ? `${ahead.aircraft.callsign} lands before it, ${Math.round(ahead.distanceNm)} miles out.` : `Nothing is ahead of it to runway ${ac.assignedRunway}.`);
+    if (behind) parts.push(`${behind.aircraft.callsign} is ${Math.max(1, Math.round(behind.distanceNm - miles))} miles behind it.`);
+    const on = sim.runwayState.get(physical)?.occupants.filter((id) => id !== ac.id) ?? [];
+    parts.push(on.length ? `${on.map((id) => sim.get(id)?.callsign ?? id).join(" and ")} ${on.length > 1 ? "are" : "is"} on runway ${ac.assignedRunway} now.` : `Runway ${ac.assignedRunway} is clear right now.`);
+    return {
+      approach: { runway, miles: tidy(miles, 1), decisionNm: sim.config.rules.decisionDistanceNm, others },
+      around: parts.join(" "),
+    };
+  }
+
+  /** The few moments that explain how this flight got here, in plain words, oldest first. */
+  private story(ac: Aircraft, h: History): HandoffBrief["story"] {
+    const { record } = h;
+    const lines: { t: number; text: string }[] = [];
+    const add = (t: number, text: string) => {
+      if (lines[lines.length - 1]?.text !== text) lines.push({ t, text });
+    };
+    const events = [
+      ...record.markers.map((m) => ({ t: m.t, marker: m })),
+      ...record.messages.map((m) => ({ t: m.t, message: m })),
+    ].sort((a, b) => a.t - b.t);
+    for (const e of events) {
+      if ("marker" in e && e.marker) {
+        const m = e.marker;
+        const other = m.otherFlightId ? (this.sim.get(m.otherFlightId)?.callsign ?? m.otherFlightId) : undefined;
+        if (m.kind === "conflict") add(m.t, other ? `Runway conflict with ${other}` : "Runway conflict");
+        else if (m.kind === "takeover") add(m.t, "You took over");
+        else if (m.kind === "handback") add(m.t, "You handed it back to the agent");
+        else if (m.kind === "closure") {
+          // The all-stations closure is everyone's news; only a flight it moved has a story here.
+          const shut = /^Runway (\S+) shut: (\S+)/.exec(m.label);
+          const moved = /^Runway (\S+) to (\S+), after readback/.exec(m.label);
+          if (shut) add(m.t, `Its runway ${shut[1]} closed; it was offered ${shut[2]}`);
+          else if (moved) add(m.t, `Moved to runway ${moved[2]}`);
+        }
+        continue;
+      }
+      const m = (e as { message: Message }).message;
+      if (m.decision?.verdict === "rejected") continue;
+      if (m.from === "pilot" && (m.kind === "escalation" || m.kind === "emergency")) {
+        add(m.t, h.escalation && m.kind === "escalation" ? `Pilot reported a ${h.escalation} and asked for a person` : "Pilot declared an emergency");
+      } else if (m.from === "controller" && m.kind === "escalation") {
+        add(m.t, "Agent told the pilot to stand by for a person");
+      } else if (m.from === "operator") {
+        if (/priority/i.test(m.text)) add(m.t, `You gave it priority to land on ${ac.assignedRunway}`);
+        else if (/paramedics/i.test(m.text)) add(m.t, `You called paramedics to gate ${ac.gate}`);
+        else if (m.decision?.action) add(m.t, `You told it to ${this.order({ type: m.decision.action as ClearanceType }, ac)}`);
+      } else if (m.from === "controller" && m.kind === "clearance" && m.decision?.action) {
+        add(m.t, `Agent told it to ${this.order({ type: m.decision.action as ClearanceType }, ac)}`);
+      }
+    }
+    return lines.slice(-4);
+  }
+
   /** A clearance as an order in plain words: "stop where it is", "abort the landing and climb away". */
   private order(c: { type: ClearanceType; runway?: string; gate?: string }, ac: Aircraft): string {
     const rw = c.runway ?? ac.assignedRunway;
@@ -371,6 +441,18 @@ export class Ops {
       case "RETURN_TO_LAND": return "come straight back to land";
       default: return this.clearanceWords(c);
     }
+  }
+
+  /** A mayday, said plainly: what failed, what it is doing about it, and how far it has to go. */
+  private engineFailure(ac: Aircraft, miles: number): { problem: string; context: string } | null {
+    const emergency = ac.emergencyId ? this.sim.emergencies.get(ac.emergencyId) : undefined;
+    if (emergency?.type !== "engine_failure") return null;
+    const rw = ac.assignedRunway;
+    if (ac.altitudeFt <= 0) return { problem: "Engine failure, now on the ground", context: `It landed on runway ${rw}. Fire and rescue are with it.` };
+    const where = `${miles} miles from runway ${rw}, at ${Math.round(ac.altitudeFt / 100) * 100} ft`;
+    return ac.flags.emergencyReturn
+      ? { problem: "Engine failure after takeoff", context: `It is turning back to land on runway ${rw}. Now ${where}.` }
+      : { problem: "Engine failure", context: `It is landing on runway ${rw} as soon as it can. Now ${where}.` };
   }
 
   /** Two aircraft and one runway, said the way a person would say it. */
@@ -439,7 +521,7 @@ export class Ops {
 
     const miles = Math.max(1, Math.round(distanceToThreshold(sim, ac) / NM));
     const minutes = Math.max(1, Math.round(touchdownIn(sim, ac) / 60));
-    const runway = this.runwayConflict(ac, miles, minutes);
+    const runway = this.runwayConflict(ac, miles, minutes) ?? this.engineFailure(ac, miles);
     const problem = cap(h.escalation ?? runway?.problem ?? h.record.summary.risk.reasons[0] ?? "The pilot asked for a person");
     const context = runway
       ? runway.context
@@ -472,20 +554,27 @@ export class Ops {
       const recent = sim.time - (latest.acknowledgedAt ?? -Infinity) < 60;
       if (latest.status === "transmitted") now.push(`${who} told ${ac.callsign} to ${order}. Waiting for the pilot to confirm.`);
       else if (latest.status === "readback_missing") now.push(`The pilot did not confirm the order to ${order}.`);
-      else if (latest.status === "acknowledged" && recent && latest.issuedBy !== OPERATOR) now.push(`${ac.callsign} confirmed it will ${order}.`);
-      if (!held && latest.issuedBy !== OPERATOR && latest.status === "transmitted") agentDoing = { text: `telling ${ac.callsign} to ${order}`, cancelledByTakeover: false };
+      // Before takeover, the suggestion line already says it was confirmed.
+      else if (latest.status === "acknowledged" && recent && latest.issuedBy !== OPERATOR && held) now.push(`${ac.callsign} confirmed it will ${order}.`);
+      if (!held && latest.issuedBy !== OPERATOR && latest.status === "transmitted") {
+        agentDoing = { text: `The agent is already telling ${ac.callsign} to ${order}.`, cancelledByTakeover: false };
+      } else if (!held && latest.issuedBy !== OPERATOR && latest.status === "acknowledged" && recent) {
+        agentDoing = { text: `The agent has told ${ac.callsign} to ${order}, and the pilot confirmed.`, cancelledByTakeover: false };
+      }
     }
     if (!held) {
       for (const c of this.agentUnsaid(ac)) {
         now.push(`The agent is about to tell ${ac.callsign} to ${this.order(c, ac)}.`);
-        agentDoing = { text: `telling ${ac.callsign} to ${this.order(c, ac)}`, cancelledByTakeover: true };
+        agentDoing = { text: `The agent is already telling ${ac.callsign} to ${this.order(c, ac)}.`, cancelledByTakeover: true };
       }
     }
     for (const r of open) {
       if (r.type !== "OTHER" && r.heardAt !== undefined && sim.time - r.heardAt >= 60) now.push(`The pilot has waited ${Math.floor((sim.time - r.heardAt) / 60)} min for ${r.type.toLowerCase()}.`);
     }
 
-    return { problem, context, deadline, recommend: this.recommend(ac), now, agentDoing, onHandback: held ? this.onHandback(ac) : null };
+    return {
+      problem, context, deadline, recommend: this.recommend(ac), now, agentDoing,
+      ...this.surroundings(ac), story: this.story(ac, h), onHandback: held ? this.onHandback(ac) : null };
   }
 
   instruct(id: string, body: Partial<OperatorInstruction>): Result {
