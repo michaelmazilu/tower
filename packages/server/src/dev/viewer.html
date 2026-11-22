@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TowerAI simulation viewer</title>
+<style>
+  :root {
+    --bg: #0b1117; --panel: #111a22; --line: #22303c; --text: #d7e0e8; --dim: #7d8c99;
+    --grass: #0e161d; --apron: #17222c; --terminal: #2a3947; --taxi: #3b4a58; --lane: #2c3945;
+    --runway: #5b6672; --mark: #e9eef2; --hold: #e0a23c; --dep: #6cb6ff; --arr: #f2c14e;
+    --stopped: #ff7b72; --route: #3fb950; --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  #wrap { position: relative; height: 100%; }
+  #map { position: absolute; inset: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; display: block; }
+  canvas.dragging { cursor: grabbing; }
+  #c3 { display: none; }
+  body.three #c { display: none; }
+  body.three #c3 { display: block; }
+  #mode, #cams { position: absolute; left: 12px; display: flex; gap: 6px; align-items: center; }
+  #mode { top: 48px; }
+  #cams { top: 82px; display: none; }
+  body.three #cams { display: flex; }
+  #cams span { color: var(--dim); font-size: 11px; margin-right: 2px; }
+  #badge { position: absolute; left: 12px; top: 12px; background: #111a22cc; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; pointer-events: none; }
+  #badge b { font-weight: 600; } #badge span { color: var(--dim); }
+  #credit, #hint { position: absolute; left: 12px; color: #c3ced8; font-size: 11px; background: #0b1117b3; padding: 2px 6px; border-radius: 4px; max-width: calc(100% - 24px); }
+  #credit { bottom: 8px; }
+  #hint { bottom: 30px; }
+  aside { position: absolute; top: 0; right: 0; bottom: 0; width: 300px; background: #111a22e6; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  body.nopanel aside { display: none; }
+  #showpanel { position: absolute; top: 12px; right: 12px; display: none; }
+  body.nopanel #showpanel { display: block; }
+  #hidepanel { float: right; padding: 2px 8px; }
+  section { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  h2 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+  #clock { font: 600 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  #stats { color: var(--dim); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  button { background: #1a2632; color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 4px 9px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #list { flex: 0 1 auto; overflow-y: auto; padding: 0; max-height: 44%; }
+  #list h2 { padding: 10px 12px 0; }
+  .ac { display: grid; grid-template-columns: 74px 1fr auto; gap: 6px; padding: 4px 12px; cursor: pointer; align-items: baseline; }
+  .ac:hover, .ac.sel { background: #1a2632; }
+  .ac b { font: 600 12px ui-monospace, Menlo, monospace; }
+  .ac .ph { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ac .num { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  #radio { flex: 1 1 0; overflow-y: auto; min-height: 0; border-bottom: 0; }
+  .tx { margin: 0 0 6px; color: var(--text); }
+  .tx i { font-style: normal; color: var(--dim); font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .tx.twr { color: #9ecbff; }
+  #off { color: var(--stopped); display: none; margin-top: 6px; }
+  @media (max-width: 760px) { aside { top: auto; left: 0; width: auto; height: 42%; border-left: 0; border-top: 1px solid var(--line); } #hint { display: none; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="map">
+    <canvas id="c"></canvas>
+    <canvas id="c3"></canvas>
+    <div id="badge"><b id="apt">TowerAI</b> <span>simulation viewer · debug tool, not the dashboard</span></div>
+    <div id="mode"><button data-mode="2d">2D map</button><button data-mode="3d">3D</button></div>
+    <div id="cams"><span>Camera</span><button data-cam="free" class="on">Free</button><button data-cam="follow">Follow</button><button data-cam="chase">Chase</button><button data-lines title="Show the taxi lines and hold points the simulation uses">Taxi lines</button></div>
+    <button id="showpanel" data-panel>Show panel</button>
+    <div id="hint"></div>
+    <div id="credit"></div>
+  </div>
+  <aside>
+    <section>
+      <button id="hidepanel" data-panel title="Hide this panel">Hide</button>
+      <div id="clock">--:--</div>
+      <div id="stats">connecting…</div>
+      <div id="off">Disconnected from the server. Retrying…</div>
+      <div class="row" id="speeds">
+        <button data-pause>Pause</button>
+        <button data-speed="1">1×</button><button data-speed="4">4×</button><button data-speed="8">8×</button><button data-speed="16">16×</button>
+      </div>
+      <div class="row">
+        <button data-reset="guided-demo">Restart demo</button>
+        <button data-fit>Fit airport</button>
+        <button data-all>Fit all traffic</button>
+      </div>
+    </section>
+    <section id="list"><h2>Aircraft</h2><div id="rows"></div></section>
+    <section id="radio"><h2>Radio</h2><div id="log"></div></section>
+  </aside>
+</div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("c"), ctx = canvas.getContext("2d");
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const C = Object.fromEntries(["bg","grass","apron","terminal","taxi","lane","runway","mark","hold","dep","arr","stopped","route","dim","text","accent"].map((k) => [k, css("--" + k)]));
+
+  let airport = null, nodes = new Map(), snap = null, status = null, selected = null, ws = null;
+  let mode = "2d";
+  const HINTS = {
+    "2d": "drag to pan · scroll to zoom · click an aircraft · double-click to fit",
+    "3d": "drag to rotate · right-drag or shift-drag to move · scroll to zoom · click an aircraft, then Follow or Chase",
+  };
+  const fire = (name, detail) => window.dispatchEvent(new CustomEvent(name, { detail }));
+  function setMode(m) {
+    mode = m;
+    document.body.classList.toggle("three", m === "3d");
+    for (const b of document.querySelectorAll("[data-mode]")) b.classList.toggle("on", b.dataset.mode === m);
+    $("hint").textContent = HINTS[m];
+    try { localStorage.setItem("towerai-viewer-mode", m); } catch {}
+    showCredit();
+    if (m === "2d") resize();
+  }
+  function setCam(c) {
+    for (const b of document.querySelectorAll("[data-cam]")) b.classList.toggle("on", b.dataset.cam === c);
+    fire("tv:cam", c);
+  }
+  let imageryCredit = "", linesOn = false;
+  function showCredit() {
+    const base = airport?.attribution ?? airport?.disclaimer ?? "";
+    $("credit").textContent = mode === "3d" && imageryCredit ? `${imageryCredit} · Map data ${base}` : base;
+  }
+  window.addEventListener("tv:imagery", (e) => { imageryCredit = e.detail.credit; showCredit(); });
+  window.addEventListener("tv:cam-changed", (e) => { for (const b of document.querySelectorAll("[data-cam]")) b.classList.toggle("on", b.dataset.cam === e.detail); });
+  const view = { x: 0, y: 0, k: 0.1 };
+  let W = 0, H = 0;
+
+  const sx = (x) => W / 2 + (x - view.x) * view.k;
+  const sy = (y) => H / 2 - (y - view.y) * view.k;
+  const wx = (px) => view.x + (px - W / 2) / view.k;
+  const wy = (py) => view.y - (py - H / 2) / view.k;
+
+  function resize() {
+    const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    canvas.width = Math.round(W * d); canvas.height = Math.round(H * d);
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  /** Width of the side panel where it covers the right of the map (none when hidden or docked at the bottom). */
+  const panelWidth = () => (document.body.classList.contains("nopanel") || window.innerWidth <= 760 ? 0 : 300);
+  function fit(points, pad = 60) {
+    if (!points.length || !W) return;
+    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const pw = panelWidth();
+    view.k = Math.min((W - pw - pad * 2) / Math.max(x1 - x0, 1), (H - pad * 2) / Math.max(y1 - y0, 1));
+    view.x = (x0 + x1) / 2 + pw / 2 / view.k; view.y = (y0 + y1) / 2;
+  }
+  const airportPoints = () => airport.runways.flatMap((r) => r.paved ?? r.ends.map((e) => e.threshold));
+  const fitAirport = () => fit(airportPoints());
+  const fitAll = () => fit([...airportPoints(), ...(snap?.aircraft ?? []).map((a) => a.position)], 80);
+
+  // ------------------------------------------------------------- drawing
+  function poly(points, close) {
+    ctx.beginPath();
+    points.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y))));
+    if (close) ctx.closePath();
+  }
+  function label(text, x, y, color, size = 11, align = "center") {
+    ctx.font = `600 ${size}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.textAlign = align; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = C.bg; ctx.strokeText(text, x, y);
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+  }
+  const hv = (deg) => ({ x: Math.sin(deg * Math.PI / 180), y: Math.cos(deg * Math.PI / 180) });
+
+  function drawAirport() {
+    const d = airport.drawing, k = view.k;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    if (d) {
+      ctx.fillStyle = C.apron;
+      for (const a of d.aprons) { poly(a.polygon, true); ctx.fill(); }
+    }
+    ctx.fillStyle = C.terminal;
+    for (const t of airport.terminals) { poly(t.polygon, true); ctx.fill(); }
+    if (d) {
+      if (k > 0.12) {
+        ctx.strokeStyle = C.lane; ctx.lineWidth = Math.max(1, 3 * k);
+        for (const s of d.stands) { poly(s.points); ctx.stroke(); }
+      }
+      for (const kind of ["taxilane", "taxiway"]) {
+        ctx.strokeStyle = kind === "taxiway" ? C.taxi : C.lane;
+        ctx.lineWidth = Math.max(1.2, (kind === "taxiway" ? 23 : 14) * k);
+        for (const t of d.taxiways) if (t.kind === kind) { poly(t.points); ctx.stroke(); }
+      }
+    } else {
+      ctx.strokeStyle = C.taxi; ctx.lineWidth = Math.max(1.2, 23 * k);
+      for (const e of airport.edges) {
+        if (e.kind === "runway") continue;
+        const a = nodes.get(e.from), b = nodes.get(e.to);
+        ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke();
+      }
+    }
+    // Runways
+    for (const r of airport.runways) {
+      const [a, b] = r.paved ?? r.ends.map((e) => e.threshold);
+      ctx.strokeStyle = C.runway; ctx.lineCap = "butt"; ctx.lineWidth = Math.max(3, r.widthM * k);
+      ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke();
+      ctx.strokeStyle = C.mark; ctx.lineWidth = Math.max(0.6, 1.2 * k); ctx.setLineDash([Math.max(4, 36 * k), Math.max(4, 24 * k)]);
+      ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineCap = "round";
+      r.ends.forEach((e, i) => {
+        const v = hv(e.headingDeg), p = (r.paved ?? [e.threshold, e.threshold])[r.paved ? i : 0];
+        label(e.designator, sx(p.x - v.x * 140) , sy(p.y - v.y * 140), C.mark, 12);
+      });
+    }
+    // Closed taxiway segments
+    if (snap?.closedEdges?.length) {
+      ctx.strokeStyle = C.stopped; ctx.lineWidth = Math.max(3, 26 * k);
+      for (const id of snap.closedEdges) {
+        const [from, to] = id.split("|"), a = nodes.get(from), b = nodes.get(to);
+        if (a && b) { ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke(); }
+      }
+    }
+    // Hold lines
+    if (k > 0.1) {
+      ctx.fillStyle = C.hold;
+      for (const n of airport.nodes) if (n.kind === "hold_short") { ctx.beginPath(); ctx.arc(sx(n.x), sy(n.y), Math.max(1.8, 7 * k), 0, 7); ctx.fill(); }
+    }
+    // Taxiway names
+    if (d && k > 0.16) {
+      const seen = [];
+      for (const t of d.taxiways) {
+        if (!t.name || t.points.length < 2) continue;
+        const m = t.points[Math.floor(t.points.length / 2)], px = sx(m.x), py = sy(m.y);
+        if (px < 0 || py < 0 || px > W || py > H) continue;
+        if (seen.some((s) => s.n === t.name && Math.hypot(s.x - px, s.y - py) < 220)) continue;
+        if (seen.some((s) => Math.hypot(s.x - px, s.y - py) < 26)) continue;
+        seen.push({ n: t.name, x: px, y: py });
+        label(t.name, px, py, C.hold, 10);
+      }
+    }
+    // Gates
+    if (k > 0.45) for (const n of airport.nodes) if (n.kind === "gate") label(n.gate, sx(n.x), sy(n.y), C.dim, 9);
+  }
+
+  const stoppedPhases = new Set(["holding_short", "at_gate", "line_up"]);
+  function colorOf(a) {
+    if (a.emergencyId) return C.stopped;
+    if (a.altitudeFt === 0 && a.speedKts < 0.5 && a.phase !== "at_gate") return a.flight === "arrival" ? "#f7dc9b" : "#b9dcff";
+    return a.flight === "arrival" ? C.arr : C.dep;
+  }
+  function drawRoute(a) {
+    if (!a.route?.length || a.altitudeFt > 0) return;
+    const last = Math.min(a.routeLimitIndex ?? a.route.length - 1, a.route.length - 1);
+    ctx.strokeStyle = C.route; ctx.lineWidth = 2.5; ctx.setLineDash([7, 5]);
+    ctx.beginPath(); ctx.moveTo(sx(a.position.x), sy(a.position.y));
+    for (let i = a.currentWaypointIndex; i <= last; i++) { const n = nodes.get(a.route[i]); if (n) ctx.lineTo(sx(n.x), sy(n.y)); }
+    ctx.stroke(); ctx.setLineDash([]);
+    const end = nodes.get(a.route[last]);
+    if (end) { ctx.fillStyle = C.route; ctx.beginPath(); ctx.arc(sx(end.x), sy(end.y), 4, 0, 7); ctx.fill(); }
+  }
+  function drawAircraft(a) {
+    let px = sx(a.position.x), py = sy(a.position.y);
+    const off = px < 14 || py < 14 || px > W - 14 || py > H - 14;
+    const color = colorOf(a), sel = a.id === selected;
+    if (off) {
+      // Out of view: an arrow on the edge pointing toward it.
+      const cx = W / 2, cy = H / 2, ang = Math.atan2(py - cy, px - cx);
+      const t = Math.min((W / 2 - 22) / Math.abs(Math.cos(ang) || 1e-9), (H / 2 - 22) / Math.abs(Math.sin(ang) || 1e-9));
+      px = cx + Math.cos(ang) * t; py = cy + Math.sin(ang) * t;
+      ctx.save(); ctx.translate(px, py); ctx.rotate(ang); ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-5, -6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill(); ctx.restore();
+      const nm = Math.hypot(a.position.x - view.x, a.position.y - view.y) / 1852;
+      label(`${a.callsign} ${nm.toFixed(1)} NM`, px - Math.cos(ang) * 16, py - Math.sin(ang) * 16, color, 10, Math.cos(ang) > 0.3 ? "right" : Math.cos(ang) < -0.3 ? "left" : "center");
+      return;
+    }
+    const s = Math.max(7, 22 * view.k);
+    ctx.save(); ctx.translate(px, py); ctx.rotate(a.headingDeg * Math.PI / 180);
+    ctx.fillStyle = color; ctx.strokeStyle = sel ? "#fff" : C.bg; ctx.lineWidth = sel ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -s); ctx.lineTo(s * 0.22, -s * 0.2); ctx.lineTo(s * 0.95, s * 0.25); ctx.lineTo(s * 0.95, s * 0.45);
+    ctx.lineTo(s * 0.22, s * 0.3); ctx.lineTo(s * 0.18, s * 0.75); ctx.lineTo(s * 0.42, s * 0.95); ctx.lineTo(0, s * 0.88);
+    ctx.lineTo(-s * 0.42, s * 0.95); ctx.lineTo(-s * 0.18, s * 0.75); ctx.lineTo(-s * 0.22, s * 0.3); ctx.lineTo(-s * 0.95, s * 0.45);
+    ctx.lineTo(-s * 0.95, s * 0.25); ctx.lineTo(-s * 0.22, -s * 0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    if (a.phase === "at_gate" && !sel && view.k < 0.3) return;
+    label(a.callsign, px + s + 4, py - 6, color, 11, "left");
+    const sub = a.altitudeFt > 0 ? `${Math.round(a.altitudeFt / 100) * 100} ft ${Math.round(a.speedKts)} kt` : `${a.phase.replace(/_/g, " ")}${a.speedKts > 0.5 ? ` ${Math.round(a.speedKts)} kt` : ""}`;
+    label(sub, px + s + 4, py + 7, C.dim, 10, "left");
+  }
+
+  function draw() {
+    requestAnimationFrame(draw);
+    if (mode !== "2d") return;
+    ctx.fillStyle = C.grass; ctx.fillRect(0, 0, W, H);
+    if (airport) {
+      drawAirport();
+      const list = snap?.aircraft ?? [];
+      const sel = list.find((a) => a.id === selected);
+      if (sel) drawRoute(sel);
+      for (const a of list) if (a.id !== selected) drawAircraft(a);
+      if (sel) drawAircraft(sel);
+    }
+  }
+
+  // ---------------------------------------------------------- side panel
+  const clock = (t) => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  function panel() {
+    if (!snap || !status) return;
+    $("clock").textContent = clock(snap.time) + (status.paused ? "  paused" : "");
+    const st = snap.stats;
+    $("stats").textContent = `${snap.aircraft.length} aircraft · ${st.departed} departed · ${st.arrived} arrived · ${st.goArounds} go-arounds`;
+    for (const b of document.querySelectorAll("[data-speed]")) b.classList.toggle("on", !status.paused && Number(b.dataset.speed) === status.speed);
+    const pause = document.querySelector("[data-pause]");
+    pause.textContent = status.paused ? "Resume" : "Pause"; pause.classList.toggle("on", status.paused);
+    const rows = $("rows");
+    const html = snap.aircraft.map((a) => {
+      const num = a.altitudeFt > 0 ? `${Math.round(a.altitudeFt / 100) * 100} ft` : a.speedKts > 0.5 ? `${Math.round(a.speedKts)} kt` : "";
+      const where = a.flight === "arrival" ? `→ ${a.gate ?? "gate"}` : `→ ${a.assignedRunway ?? "rwy"}`;
+      return `<div class="ac${a.id === selected ? " sel" : ""}" data-id="${a.id}"><b><span class="dot" style="background:${colorOf(a)}"></span>${a.callsign}</b><span class="ph">${a.phase.replace(/_/g, " ")} ${where}</span><span class="num">${num}</span></div>`;
+    }).join("");
+    if (rows.dataset.html !== html) { rows.innerHTML = html; rows.dataset.html = html; }
+  }
+  function addRadio(e) {
+    const d = e.data ?? {}, log = $("log"), p = document.createElement("p");
+    p.className = "tx" + (d.from === "TOWER" ? " twr" : "");
+    const i = document.createElement("i"); i.textContent = clock(e.simTime ?? 0);
+    p.append(i, document.createTextNode(String(d.text ?? "")));
+    log.prepend(p);
+    while (log.children.length > 60) log.lastChild.remove();
+  }
+
+  // ------------------------------------------------------------- network
+  function connect() {
+    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+    ws.onopen = () => { $("off").style.display = "none"; };
+    ws.onclose = () => { $("off").style.display = "block"; setTimeout(connect, 1500); };
+    ws.onmessage = async (ev) => {
+      const m = JSON.parse(ev.data);
+      if (m.type === "hello") {
+        const data = await (await fetch("/api/airport")).json();
+        const first = !airport || airport.nodes.length !== data.nodes.length;
+        airport = data; nodes = new Map(airport.nodes.map((n) => [n.id, n]));
+        snap = m.snapshot; status = m.status;
+        $("apt").textContent = `${airport.icao} · ${status.scenario.name}`;
+        showCredit();
+        $("log").innerHTML = "";
+        for (const e of m.recentEvents) if (e.type === "radio.tx_completed") addRadio(e);
+        if (first) fitAirport();
+        fire("tv:airport");
+      } else if (m.type === "snapshot") { snap = m.snapshot; status = m.status; }
+      else if (m.type === "status") status = m.status;
+      else if (m.type === "events") for (const e of m.events) if (e.type === "radio.tx_completed") addRadio(e);
+      panel();
+    };
+  }
+  const control = (body) => ws?.readyState === 1 && ws.send(JSON.stringify({ type: "control", ...body }));
+
+  // --------------------------------------------------------------- input
+  // The aircraft list is redrawn as numbers change, so a row is picked on press, not on release.
+  const act = (e) => {
+    const t = e.target.closest(e.type === "click" ? "button" : ".ac");
+    if (!t) return;
+    if (t.dataset.speed) { control({ action: "resume" }); control({ action: "speed", speed: Number(t.dataset.speed) }); }
+    else if ("pause" in t.dataset) control({ action: status?.paused ? "resume" : "pause" });
+    else if (t.dataset.reset) control({ action: "reset", scenarioId: t.dataset.reset });
+    else if ("fit" in t.dataset) mode === "3d" ? fire("tv:fit") : fitAirport();
+    else if ("all" in t.dataset) mode === "3d" ? fire("tv:fitall") : fitAll();
+    else if (t.dataset.mode) setMode(t.dataset.mode);
+    else if (t.dataset.cam) setCam(t.dataset.cam);
+    else if ("lines" in t.dataset) { linesOn = !linesOn; t.classList.toggle("on", linesOn); fire("tv:lines", linesOn); }
+    else if ("panel" in t.dataset) { document.body.classList.toggle("nopanel"); resize(); }
+    else if (t.dataset.id) {
+      selected = selected === t.dataset.id ? null : t.dataset.id;
+      const a = snap?.aircraft.find((x) => x.id === selected);
+      if (a && mode === "3d") fire("tv:focus", a.id);
+      else if (a) { view.x = a.position.x; view.y = a.position.y; if (a.altitudeFt === 0) view.k = Math.max(view.k, 0.35); }
+      panel();
+    }
+  };
+  document.addEventListener("click", act);
+  $("rows").addEventListener("pointerdown", act);
+  let drag = null, moved = false;
+  canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY }; moved = false; canvas.setPointerCapture(e.pointerId); canvas.classList.add("dragging"); });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    view.x -= dx / view.k; view.y += dy / view.k; drag = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener("pointerup", (e) => {
+    canvas.classList.remove("dragging"); drag = null;
+    if (moved || !snap) return;
+    const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    let best = null, bd = 18;
+    for (const a of snap.aircraft) { const d = Math.hypot(sx(a.position.x) - px, sy(a.position.y) - py); if (d < bd) { bd = d; best = a.id; } }
+    selected = best; panel();
+  });
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    const x = wx(px), y = wy(py);
+    view.k = Math.min(6, Math.max(0.004, view.k * Math.exp(-e.deltaY * 0.0015)));
+    view.x = x - (px - W / 2) / view.k; view.y = y + (py - H / 2) / view.k;
+  }, { passive: false });
+  canvas.addEventListener("dblclick", fitAirport);
+  window.addEventListener("resize", resize);
+
+  // Shared with the 3D module (scene3d.js).
+  window.TV = {
+    get airport() { return airport; }, get nodes() { return nodes; }, get snap() { return snap; },
+    get selected() { return selected; }, get mode() { return mode; },
+    select(id) { selected = id; panel(); },
+    panelWidth,
+    colorOf,
+  };
+  let saved = "3d";
+  try { saved = localStorage.getItem("towerai-viewer-mode") ?? "3d"; } catch {}
+  resize(); setMode(saved === "2d" ? "2d" : "3d"); connect(); requestAnimationFrame(draw);
+})();
+</script>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<script type="module" src="/viewer/scene3d.js"></script>
+</body>
+</html>

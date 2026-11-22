@@ -1,0 +1,11 @@
+{
+  "name": "@towerai/world",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Worldwide multi-agent ATC simulation and recorder. See NOTICE for BlueSky and OpenAP attribution.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@towerai/contracts": "*" }
+}

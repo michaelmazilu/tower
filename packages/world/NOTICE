@@ -1,0 +1,21 @@
+@towerai/world third-party notices
+
+BlueSky ATC Simulator, Copyright (c) 2025 TU Delft, MIT License
+https://github.com/TUDelft-CNS-ATM/bluesky
+  src/bluesky/geo.ts, detect.ts and mvp.ts are TypeScript ports of
+  bluesky/tools/geo/_geo.py, bluesky/traffic/asas/statebased.py and mvp.py.
+  Licence: licenses/BlueSky-MIT.txt
+
+OpenAP, Junzi Sun and contributors, GNU Lesser General Public License v3.0
+https://github.com/junzis/openap
+  src/openap/aero.ts and gen.ts are modified TypeScript ports (2026-11-22) of
+  openap/aero.py and openap/gen.py. They form a separate module under
+  LGPL-3.0-only, may be edited or replaced independently, and are the only
+  files under that licence.
+  Licences: licenses/OpenAP-LGPL-3.0.txt and licenses/GPL-3.0.txt
+
+No data from either project is included or derived from: not OpenAP's
+openap/data, not BlueSky's resources/navdata. Aircraft performance figures in
+src/perf.ts are our own rounded, approximate, typical values. Airport
+coordinates, runway directions, frequencies and fixes are approximate or
+fictional and are not for navigation. All traffic is synthetic.

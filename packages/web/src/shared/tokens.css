@@ -1,0 +1,23 @@
+/* TowerAI visual rules: red, white, grey, black. Square and sharp. No other hue, no radius, no gradient, no shadow blur. */
+:root {
+  --black: #0b0b0b;
+  --grey-900: #171717;
+  --grey-800: #242424;
+  --grey-600: #555555;
+  --grey-400: #9b9b9b;
+  --grey-200: #d6d6d4;
+  --grey-100: #e9e9e7;
+  --white: #fafaf9;
+  /* Red means attention or the one primary control. Nothing decorative. */
+  --red: #e2231a;
+  --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --line: 1px solid var(--grey-200);
+  --unit: 8px;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-radius: 0 !important;
+}

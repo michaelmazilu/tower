@@ -1,0 +1,50 @@
+html, body, #root { height: 100%; margin: 0; }
+body {
+  overflow: hidden;
+  background: var(--white);
+  color: var(--black);
+  font: 14px/1.35 var(--sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+button, input { font: inherit; }
+:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+
+.app { height: 100%; display: flex; flex-direction: column; }
+.screen { flex: 1; min-height: 0; overflow: hidden; }
+.top { flex: none; height: 56px; display: flex; border-bottom: var(--line); background: var(--white); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 24px 0 16px; border-right: var(--line); font-size: 20px; font-weight: 700; }
+.brand i { width: 16px; height: 16px; background: var(--black); }
+.tabs { display: flex; }
+.tabs a { min-width: 120px; padding: 8px 12px; display: flex; flex-direction: column; justify-content: space-between; border-right: var(--line); color: var(--grey-600); font-size: 14px; text-decoration: none; }
+.tabs a b { font: 12px/1 var(--mono); }
+.tabs a:hover { background: var(--grey-100); }
+.tabs a[aria-current] { background: var(--black); color: var(--white); }
+
+.btn {
+  position: relative;
+  width: 64px;
+  height: 56px;
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  border: 0;
+  background: var(--white);
+  color: var(--black);
+  text-align: left;
+  cursor: pointer;
+  line-height: 1.1;
+}
+.btn b { font: 700 14px/1.1 var(--sans); }
+.btn span { font-size: 12px; }
+.btn:hover:not(:disabled) { background: var(--grey-100); }
+.btn:active:not(:disabled) { background: var(--grey-200); }
+.btn:disabled { color: var(--grey-600); cursor: default; }
+.btn-on, .btn-on:hover:not(:disabled), .btn-on:disabled { background: var(--black); color: var(--white); }
+.btn-red, .btn-red:hover:not(:disabled) { background: var(--red); color: var(--white); }
+.btn-red:active:not(:disabled) { background: var(--black); }
+.btn-invert, .btn-invert:hover:not(:disabled) { background: var(--white); color: var(--black); }
+
+.wait { height: 100%; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--grey-600); }

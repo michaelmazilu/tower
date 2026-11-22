@@ -1,0 +1,12 @@
+{
+  "name": "@towerai/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic simulation engine, airport graph, clearance validation and tool gateway. No Node-only APIs, so the browser can import it too.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -1,0 +1,369 @@
+{
+  "recordedAt": "2026-11-22T07:42:31.852Z",
+  "replies": {
+    "17196d76b619a953732c6d43": {
+      "optionId": "level_30000",
+      "reason": "BAW38 is at FL310; FL300 preserves 1000 ft separation.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1734,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "f86fbbf111670a1cc717a507"
+    },
+    "a7fedbe71f2e950cef1a26fd": {
+      "optionId": "path",
+      "reason": "36-second gap is below the required 115 seconds",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1289,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "e8af049a02d63928c2bf3d86"
+    },
+    "8dcfa8f6eadeb58bcc3fb356": {
+      "optionId": "path",
+      "reason": "66-second gap is below the required 115 seconds",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1246,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "e4c90f239d90580a45c638e6"
+    },
+    "17b99bea31be3fa38a6d4bc3": {
+      "optionId": "readback",
+      "reason": "Controller instructed stop climb at flight level 300.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1156,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "ec55550d91f8550b3bcbe1b6"
+    },
+    "a3d4b0fb3bfc08e2eddebf72": {
+      "optionId": "readback",
+      "reason": "Number 2 behind JetBlue 616; direct DELEX then INTOL.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1198,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "f16d39a85e7b78af043f6bf1"
+    },
+    "b7af1d6d4967b7e8b1cc8fab": {
+      "optionId": "readback",
+      "reason": "Controller assigned number 2, direct DELEX then INTOL.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1189,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "08c220a36e36d02ee63bc8fe"
+    },
+    "9b9c0aaf70bebe2f0475b650": {
+      "optionId": "path",
+      "reason": "72-second gap is below the required 115 seconds.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1388,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "35aac3a8b99ae3b37b145d3c"
+    },
+    "364e71655d5ae17dd2eca66e": {
+      "optionId": "readback",
+      "reason": "Controller assigned number 2 and direct DELEX then INTOL.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1460,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "6177984af7aac20fbc2a1386"
+    },
+    "3f0252f59312e5859ea80a06": {
+      "optionId": "priority",
+      "reason": "PAN-PAN medical emergency; 81 miles to runway 24R",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1282,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "c8dd1371fa7932daa80f11e1"
+    },
+    "b8fd2db73cd66dacb59f29cd": {
+      "optionId": "heading_right",
+      "reason": "Right turn increases heading divergence from DAL156.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 2541,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "c1b48970d63ec0e2df7c840a"
+    },
+    "9774aa92ffdb775754686b1b": {
+      "optionId": "readback",
+      "reason": "Controller assigned heading 300 for traffic.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1698,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "3c078488e054a80650528fa0"
+    },
+    "917a13be0e563c63b8496885": {
+      "optionId": "path",
+      "reason": "Required landing gap is 115 seconds; current gap is 102.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1521,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "a840807a1bd47fc7ffc061ce"
+    },
+    "071286778461dfb23761a7fb": {
+      "optionId": "readback",
+      "reason": "Controller assigned number 2 and direct DELEX for spacing.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1140,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "fad9e7925a601da97cdbee61"
+    },
+    "7529f814226fd46003a975f5": {
+      "optionId": "heading_left",
+      "reason": "FDB415 is same level and heading; turn left for separation.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1463,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "39b4a2ac4f9a95731ad507fc"
+    },
+    "91a23cd30bcab0fabfd4b4d1": {
+      "optionId": "readback",
+      "reason": "Controller issued left heading 085 for traffic.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1173,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "fffa343088ed9d87d92001cb"
+    },
+    "2c1532fd6a0190334d06fdc3": {
+      "optionId": "return_landing",
+      "reason": "MAYDAY engine failure; runway 22L is available for landing",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1604,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "96fa2404d00fa457bf69247d"
+    },
+    "be7ffd86c2b42bed0a997c56": {
+      "optionId": "level_36000",
+      "reason": "Both aircraft are at FL370; descend CPA714 to restore vertical separation.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1426,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "7fdce9b4bbba6a40c7dbafee"
+    },
+    "69e936d9b1d7c8aea61969bb": {
+      "optionId": "readback",
+      "reason": "Controller instructed descent to flight level 360.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 5690,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "3c61075a16d6b1e9b2deff21"
+    },
+    "fe1f5fb373d44238ea154e5d": {
+      "optionId": "level_36000",
+      "reason": "Both aircraft are at FL370; descend Qatari 504 to restore vertical separation.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 3109,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "bada9217d1f38cfa7215d797"
+    },
+    "faae76412f71b79a52fb7f2e": {
+      "optionId": "readback",
+      "reason": "Controller instructed descent to flight level 360 due traffic.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1136,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "eb738d1cc84dc066e560e9ee"
+    },
+    "c7a2d0168f8bd065b7aae389": {
+      "optionId": "path",
+      "reason": "90-second gap is below the required 115 seconds.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1410,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "961e650e49e1acb3760f1dd3"
+    },
+    "19f3c54e5a16a579c5dd5b59": {
+      "optionId": "readback",
+      "reason": "Number 2 behind Lufthansa 903; DELEX then BASIX for spacing.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1210,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "1b8de66333139fda9eb6bb43"
+    },
+    "4a71363d58e92f666cebcc93": {
+      "optionId": "heading_left",
+      "reason": "Predicted separation is 0.0 NM; turn left for traffic.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1200,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "c1fa19f97b98aaaf8317802d"
+    },
+    "3bc08fa917bbe7dd4ffaa9dd": {
+      "optionId": "readback",
+      "reason": "Controller issued left heading 005 for traffic.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1194,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "9c5a8af71d6a1c0220415cf4"
+    },
+    "179c0f52e3dea909e3095335": {
+      "optionId": "heading_right",
+      "reason": "Predicted 0.0 NM with ANZ829 in 468 seconds",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1845,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "f7151ca62ffb58e485afe383"
+    },
+    "4383e1bb6ce6c30f8b709aef": {
+      "optionId": "readback",
+      "reason": "Controller instructed a right turn to heading 120.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1152,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "1d13a78e1860d8f1b473c096"
+    },
+    "3cdbf08abbb3dd006b3c20d8": {
+      "optionId": "heading_left",
+      "reason": "Predicted 0.1 NM; left turn provides traffic vectors.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1342,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "37cd67d455f91d1919015d44"
+    },
+    "1311e5f37c7da5cdee5e086c": {
+      "optionId": "readback",
+      "reason": "Controller instructed left heading 085 for traffic.",
+      "timings": [
+        {
+          "stage": "decide",
+          "ms": 1452,
+          "kind": "measured",
+          "source": "ElevenLabs agent (gpt-6-luna), recorded 2026-11-22"
+        }
+      ],
+      "match": "e7c6bdda3811baa96cab02cd"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@towerai/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Realtime host for the TowerAI simulation: HTTP tool gateway, WebSocket state stream, run persistence.",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@towerai/core": "*",
+    "three": "^0.187.0",
+    "ws": "^8.18.0",
+    "@towerai/contracts": "*",
+    "@towerai/world": "*"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+data/runs/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+packages/server/data/usage.json
+packages/server/data/**/*.tmp
+
+# ElevenLabs agent ids: anyone holding one can spend the account's credits.
+packages/server/data/agents.json
