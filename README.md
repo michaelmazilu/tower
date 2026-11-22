@@ -1,6 +1,16 @@
 # TowerAI
 
-Air traffic control is one of the most critical yet human-dependent systems in aviation. TowerAI shows AI managing it autonomously: a controller talks with independent pilots in radio phraseology, tracks every aircraft, issues clearances through validated tools, explains each decision, and calls a person when it should.
+**We are going to give every air traffic controller a coworker.**
+
+On November 13, America stopped taking off. One air traffic control failure [halted departures nationwide](https://www.faa.gov/newsroom/faa-statement-nationwide-ground-stop) for over four hours, [disrupting hundreds of thousands of travelers](https://www.cnbc.com/2026/11/13/faa-ground-stop.html). Our skies depend on this system, yet it rests on [roughly 11,000 U.S. controllers](https://www.politifact.com/article/2026/may/26/air-traffic-control-staffing-target-FAA-hiring/), many working [ten-hour days, six days a week](https://www.npr.org/2025/07/17/nx-s1-5453878/air-traffic-controllers-sean-duffy-faa). They don't need to be replaced. They need backup.
+
+Using ElevenLabs, we built an AI coworker that works the radio beside the controller, speaking with pilots in real aviation phraseology in a live simulation of Toronto Pearson.
+
+TowerAI watches every aircraft, handles routine clearances, and checks each one against safety rules before it is spoken. It flags the flights at highest risk, explains every decision, and calls a human when judgment matters. With one click, the controller takes over. With another, they hand it back.
+
+It never gets tired, always shows its work, and knows when to ask for help. **That's a coworker we'd hire.**
+
+*This is a simulation, not a system for real traffic. The live demo runs a rules controller so it is reliable; the ElevenLabs agents are optional, and their recorded decisions are labelled `llm`. [What is real and what is modelled](docs/DEMO.md#real-and-modelled).*
 
 ## Run it
 

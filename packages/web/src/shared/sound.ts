@@ -74,6 +74,10 @@ export class Speaker {
     this.timer = setTimeout(() => this.advance(rate), FINISH_MS);
   }
 
+  get busy(): boolean {
+    return !!(this.audio || this.words);
+  }
+
   stop(): void {
     clearTimeout(this.timer);
     this.next = null;

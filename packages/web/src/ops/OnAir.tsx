@@ -61,7 +61,7 @@ export function OnAir({ ops, muted, sound, nameOf, onOpen, refresh }: {
                 {onAir.flightId && nameOf(onAir.flightId) !== onAir.speaker && (
                   <button onClick={() => onOpen(onAir.flightId!)}>{nameOf(onAir.flightId)}</button>
                 )}
-                <span>{ops.speed > 1 ? "sound plays at 1x" : voiceKind(audioUrl)}</span>
+                <span>{muted ? "live, muted during replay" : ops.speed > 1 ? "sound plays at 1x" : voiceKind(audioUrl)}</span>
               </>
             ) : (
               <span>{voice.available ? `${voice.label}. Browser voice for the rest` : "Browser voice"}</span>

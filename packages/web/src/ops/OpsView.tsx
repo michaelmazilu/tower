@@ -8,11 +8,10 @@ import { FlightGrid } from "./FlightGrid";
 import { OnAir } from "./OnAir";
 import { TakeOverKey, OperatorPanel, useOperator } from "./Operator";
 import { get, post, type OpsLink } from "./useOps";
+import { useReplay } from "./useReplay";
 import "./ops.css";
 
 const RECORD_MS = 1000;
-const REPLAY_STEP_MS = 80;
-const REPLAY_RATE = 4;
 
 export function OpsStatus({ link }: { link: OpsLink }) {
   const { ops, state } = link;
@@ -98,18 +97,18 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
     };
   }, [replaying, ids]);
 
-  useEffect(() => {
-    if (!replaying || !playing) return;
-    const timer = setInterval(() => setCursor((c) => (c === null ? c : c + (REPLAY_STEP_MS / 1000) * REPLAY_RATE)), REPLAY_STEP_MS);
-    return () => clearInterval(timer);
-  }, [replaying, playing]);
-
-  useEffect(() => {
-    if (cursor !== null && playing && cursor >= ops.t) {
+  useReplay({
+    cursor,
+    playing,
+    audible: sound.on && sound.ready,
+    messages: (selectedId ? records[selectedId]?.messages : undefined) ?? NO_MESSAGES,
+    end: ops.t,
+    onMove: setCursor,
+    onEnd: () => {
       setCursor(null);
       setPlaying(false);
-    }
-  }, [cursor, playing, ops.t]);
+    },
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -214,6 +213,7 @@ function Operations({ link, ops, sound }: { link: OpsLink; ops: OpsState; sound:
 }
 
 const NO_TRACK: FlightRecord["track"] = [];
+const NO_MESSAGES: FlightRecord["messages"] = [];
 // An outcome shows for its few seconds, under nothing but a critical alert.
 const SEVERITY = { critical: 3, normal: 2, high: 1, watch: 0 };
 

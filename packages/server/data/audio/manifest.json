@@ -582,5 +582,133 @@
     "characters": 74,
     "firstByteMs": 159,
     "recordedAt": "2026-11-22T07:44:18.978Z"
+  },
+  "aa886148b10053c05912e740.mp3": {
+    "text": "Tower, WestJet 3 0 2, holding short runway 2 3, ready for departure.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 68,
+    "firstByteMs": 205,
+    "recordedAt": "2026-11-22T16:26:06.554Z"
+  },
+  "4d50ec4355eea435c6487736.mp3": {
+    "text": "Lufthansa 4 7 1, you have priority, number 1 for runway 2 3.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 60,
+    "firstByteMs": 155,
+    "recordedAt": "2026-11-22T16:26:06.900Z"
+  },
+  "4cb6a6b0ab4ec36bdadd70d8.mp3": {
+    "text": "WestJet 3 0 2, runway 2 3, cleared for takeoff.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 47,
+    "firstByteMs": 162,
+    "recordedAt": "2026-11-22T16:26:07.253Z"
+  },
+  "71f0f6a59518bb9a1cdb6b06.mp3": {
+    "text": "Runway 2 3, cleared for takeoff, WestJet 3 0 2.",
+    "voice": "Brian",
+    "model": "eleven_flash_v2_5",
+    "characters": 47,
+    "firstByteMs": 178,
+    "recordedAt": "2026-11-22T16:26:07.633Z"
+  },
+  "27df3d663978ecc60290d2dc.mp3": {
+    "text": "All stations, Toronto weather, wind 2 3 0 at 1 8 gusting 2 7, snow, braking action poor runway 2 4 right.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 105,
+    "firstByteMs": 165,
+    "recordedAt": "2026-11-22T16:26:07.990Z"
+  },
+  "0007b45d374b0d35bef91fc4.mp3": {
+    "text": "Air Canada 2 1 4, turn right heading 2 niner 0, climb 5 thousand, speed 1 8 0 knots.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 84,
+    "firstByteMs": 174,
+    "recordedAt": "2026-11-22T16:26:08.323Z"
+  },
+  "3411fcb6ec16c46ecc22ee6a.mp3": {
+    "text": "Turn right heading 2 niner 0, climb 5 thousand, speed 1 8 0 knots, Air Canada 2 1 4.",
+    "voice": "George",
+    "model": "eleven_flash_v2_5",
+    "characters": 84,
+    "firstByteMs": 180,
+    "recordedAt": "2026-11-22T16:26:08.680Z"
+  },
+  "62bd991fde9797119b6445f1.mp3": {
+    "text": "United 1 1 niner, roger mayday, turn left heading 1 3 5, maintain 2 thousand, runway 2 4 left, number 1.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 104,
+    "firstByteMs": 162,
+    "recordedAt": "2026-11-22T16:26:09.024Z"
+  },
+  "70010ebd174c76f150d7ce18.mp3": {
+    "text": "Turn left heading 1 3 5, maintain 2 thousand, runway 2 4 left, number 1, United 1 1 niner.",
+    "voice": "Matilda",
+    "model": "eleven_flash_v2_5",
+    "characters": 90,
+    "firstByteMs": 177,
+    "recordedAt": "2026-11-22T16:26:09.405Z"
+  },
+  "f7af129eaa8c886ffd260001.mp3": {
+    "text": "Fire and rescue, Toronto Tower, emergency United 1 1 niner, engine failure, runway 2 4 left, take standby positions.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 116,
+    "firstByteMs": 163,
+    "recordedAt": "2026-11-22T16:26:09.750Z"
+  },
+  "04314cb3e1e179a80fa26f7c.mp3": {
+    "text": "Fire and rescue, standing by runway 2 4 left for United 1 1 niner.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 66,
+    "firstByteMs": 163,
+    "recordedAt": "2026-11-22T16:26:10.032Z"
+  },
+  "a3c01069650c8c784ef7107e.mp3": {
+    "text": "All stations, runway 2 4 right is closed for snow clearing, arrivals use runway 2 4 left.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 89,
+    "firstByteMs": 160,
+    "recordedAt": "2026-11-22T16:26:10.346Z"
+  },
+  "7a3c01a2da3da5ab0c7d8885.mp3": {
+    "text": "Air France 3 5 6, runway 2 4 right not available, change to runway 2 4 left.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 76,
+    "firstByteMs": 167,
+    "recordedAt": "2026-11-22T16:26:10.673Z"
+  },
+  "b92d3e0ecb4279bd17a4b4d0.mp3": {
+    "text": "Approach, Lufthansa 4 7 1, 1 2 mile final runway 2 3.",
+    "voice": "Charlie",
+    "model": "eleven_flash_v2_5",
+    "characters": 53,
+    "firstByteMs": 145,
+    "recordedAt": "2026-11-22T16:26:11.037Z"
+  },
+  "df241639ff52878c7216c879.mp3": {
+    "text": "Paramedics, Toronto Tower operator, medical emergency Lufthansa 4 7 1, meet at gate 1 7 3.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 90,
+    "firstByteMs": 154,
+    "recordedAt": "2026-11-22T16:26:11.419Z"
+  },
+  "39a8b81a0e0ba71ccb3fdf13.mp3": {
+    "text": "Paramedics copy, meeting Lufthansa 4 7 1 at gate 1 7 3.",
+    "voice": "Eric",
+    "model": "eleven_flash_v2_5",
+    "characters": 55,
+    "firstByteMs": 155,
+    "recordedAt": "2026-11-22T16:26:11.713Z"
   }
 }
