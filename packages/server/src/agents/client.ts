@@ -30,8 +30,10 @@ export class CreditGuard {
     private readonly readRemote: () => Promise<number>,
     cap = DEFAULT_CAP,
     private readonly file = dataPath("usage.json"),
+    /** Only an offline recording script, run by the account owner, passes a ceiling above HARD_CAP. */
+    ceiling = HARD_CAP,
   ) {
-    this.cap = Number.isFinite(cap) ? Math.min(HARD_CAP, cap) : DEFAULT_CAP;
+    this.cap = Number.isFinite(cap) ? Math.min(ceiling, cap) : DEFAULT_CAP;
   }
 
   /** True once a meter read has succeeded and no later read has failed. */
@@ -98,17 +100,23 @@ export class ElevenLabs {
     private readonly key: string,
     cap = Number(process.env.TOWERAI_CREDIT_CAP ?? DEFAULT_CAP),
     private readonly request = fetch,
+    ceiling = HARD_CAP,
   ) {
-    this.guard = new CreditGuard(async () => {
-      const usage = await this.json<{ character_count?: number }>("GET", "/v1/user/subscription", undefined, AbortSignal.timeout(8000));
-      return usage.character_count ?? NaN;
-    }, cap);
+    this.guard = new CreditGuard(
+      async () => {
+        const usage = await this.json<{ character_count?: number }>("GET", "/v1/user/subscription", undefined, AbortSignal.timeout(8000));
+        return usage.character_count ?? NaN;
+      },
+      cap,
+      undefined,
+      ceiling,
+    );
   }
 
   /** Null without a key, which means rules and cached audio only. */
-  static fromEnv(cap?: number): ElevenLabs | null {
+  static fromEnv(cap?: number, ceiling?: number): ElevenLabs | null {
     const key = process.env.ELEVENLABS_API_KEY?.trim();
-    return key ? new ElevenLabs(key, cap) : null;
+    return key ? new ElevenLabs(key, cap, undefined, ceiling) : null;
   }
 
   /**

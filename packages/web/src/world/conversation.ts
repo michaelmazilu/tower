@@ -35,11 +35,13 @@ export function lineAt(f: FlightRecord, t: number): Message | undefined {
   return sayable(f).find((m) => m.t + m.durationS >= t);
 }
 
-/** Where a click starts: recorded voice, the exchange going on now, the notable one, or the nearest. */
+/** Where a click starts: the storyline moment, the exchange going on now, the notable one, or the nearest. */
 export function openingLine(f: FlightRecord, t: number): Message | undefined {
   const lines = sayable(f);
-  const recorded = lines.find((m) => sameOrigin(m.audioUrl));
-  if (recorded) return recorded;
+  // Every line has recorded voice, so being recorded no longer marks the moment to open on.
+  const opensAt = f.opensAt;
+  const storyline = opensAt === undefined ? undefined : lines.find((m) => m.t >= opensAt);
+  if (storyline) return storyline;
   let found: Message | undefined;
   for (const m of lines) if (!found || Math.abs(m.t - t) < Math.abs(found.t - t)) found = m;
   if (!found) return undefined;

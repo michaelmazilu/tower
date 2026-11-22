@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, test } from "vitest";
 import { BaselineController, SCENARIOS, ToolGateway, createSimulation } from "@towerai/core";
-import { CreditGuard, ElevenLabs, SpendLimitError } from "../src/agents/client";
+import { CreditGuard, ElevenLabs, HARD_CAP, SpendLimitError } from "../src/agents/client";
 import { createAskAgent } from "../src/agents/ask";
 import { attachPilots, type PilotTurn } from "../src/agents/pilots";
 import { parseChoice } from "../src/agents/decide";
@@ -53,6 +53,17 @@ test("spend is refused past the cap, before a check, and when the meter fails", 
   meter = new Error("down");
   await assert.rejects(guard.refresh());
   assert.throws(() => guard.reserve(1), SpendLimitError);
+});
+
+test("the cap stops at HARD_CAP unless a recording script names a higher ceiling", async () => {
+  const usedSoFar = async () => HARD_CAP - 10;
+  const live = new CreditGuard(usedSoFar, 50_000, join(dir, "live-usage.json"));
+  await live.refresh();
+  assert.throws(() => live.reserve(11), SpendLimitError);
+  const recording = new CreditGuard(usedSoFar, 50_000, join(dir, "recording-usage.json"), 50_000);
+  await recording.refresh();
+  recording.reserve(11);
+  assert.throws(() => recording.reserve(50_000), SpendLimitError);
 });
 
 test("a failed meter read blocks spending for seconds, not a minute", async () => {

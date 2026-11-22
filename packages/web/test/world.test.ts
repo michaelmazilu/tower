@@ -1,5 +1,6 @@
 import type { FlightRecord, WorldRecording } from "@towerai/contracts";
 import { describe, expect, it } from "vitest";
+import { openingLine } from "../src/world/conversation";
 import { indexWorld, poseAt, statsAt } from "../src/world/data";
 
 const sample = (t: number, lateralNm: number, verticalFt: number, otherFlightId: string) =>
@@ -30,5 +31,19 @@ describe("world totals at the playhead", () => {
 
   it("flies the short way over the antimeridian", () => {
     expect(Math.abs(poseAt(world.flights[0]!, 50).lon)).toBe(180);
+  });
+});
+
+describe("where a click on a flight opens", () => {
+  const line = (id: string, t: number) =>
+    ({ id, t, durationS: 3, text: id, from: "pilot", speaker: "X", audioUrl: `/api/audio/${id}.mp3`, timings: [] }) as unknown as FlightRecord["messages"][number];
+  const voiced = [line("a", 5), line("b", 50), line("c", 90)];
+
+  it("opens near the playhead when every line is recorded", () => {
+    expect(openingLine(flight("F", { messages: voiced }), 48)?.id).toBe("b");
+  });
+
+  it("opens a storyline flight on its moment, wherever the playhead is", () => {
+    expect(openingLine(flight("F", { messages: voiced, opensAt: 80 }), 5)?.id).toBe("c");
   });
 });
