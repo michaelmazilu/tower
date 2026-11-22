@@ -9,6 +9,8 @@ import type { Brain, Timing } from "./index";
  */
 
 export type Fault = "engine_failure" | "smoke" | "low_fuel";
+/** The guided flight, in order. */
+export type Stage = "check_in" | "pushback" | "taxi" | "cross" | "takeoff" | "climb";
 
 /** Synthetic instruments, derived from the simulation and the faults set on it. */
 export interface Vitals {
@@ -71,6 +73,15 @@ export interface CockpitState {
   traffic: { callsign: string; x: number; y: number; altFt: number; hdg: number; status: string }[];
   /** What a person who has never flown could say next, in their own words. Two or three. */
   coach: { now: string; trySaying: string[] };
+  stage: Stage;
+  /** Nothing moves on until the pilot speaks. */
+  waiting: boolean;
+  /** What the tower is doing for the pilot at this stage, in one line. */
+  helps: string;
+  /** Simulated seconds per real second: moving is sped up, talking is not. */
+  speed: number;
+  /** The ground route still to run. */
+  path: { x: number; y: number }[];
   /** The clearance waiting for a readback, if any. */
   readBack: string | null;
   humanCalled: boolean;

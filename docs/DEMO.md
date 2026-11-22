@@ -22,14 +22,14 @@ Press **1 cockpit**, then **reset** (bottom right). Press space once beforehand 
 
 | They do | What happens | Say |
 |---|---|---|
-| "Oh no, we're crashing!" | The tower lists the claim against the aircraft's data: on the ground, zero knots, engines normal, "you haven't taken off". It does not declare a false emergency, and it offers help. | "It didn't just hear the words. It checked the aircraft." |
+| "Oh no, we're crashing!", at the gate | The tower lists the claim against the aircraft's data: on the ground, zero knots, engines normal, "you haven't taken off". It does not declare a false emergency, and it offers help. | "It didn't just hear the words. It checked the aircraft." |
 | "Everything is fine." | The report is withdrawn. | |
-| "I want to take off, what do I need?" | The validator clears the runway and the tower says exactly what to read back. | "They've never done this. Their coworker is walking them through it." |
-| Read the big line back | The plane rolls and lifts off about 25 seconds later. A wrong runway is refused. | "Nothing moves until the readback is right. Look at the time to answer." |
+| Read the big line over the plane, then the readback, at each step: **check in**, **push back**, **taxi**, **cross**, **take off** | The validator clears each move and the tower says exactly what to read back. The plane moves in 3D at up to 12x (the badge says so) and returns to real time when it is their turn. Gate to airborne is about 35 seconds plus talking. | "They've never done this. Their coworker is walking them through every step, gate to sky." |
+| Get a readback wrong, such as leaving out "hold short 24R" | It is refused and nothing moves. | "Nothing moves until the readback is right. Look at the time to answer." |
 | Once airborne, you press **engine failure**; they say "Mayday, our engine failed!" | Now the data confirms it: mayday, a turn home, responders. They read it back. | "Same words, different data, different decision." |
 | Optional, about a minute later | The tower calls them to land. | Otherwise press **2 operations** here. |
 
-If the room is loud, type in the box: everything else works the same. Ask the visitor first: their voice goes to ElevenLabs to be transcribed.
+The lines on screen are to be read aloud: pressing them does nothing. If the room is too loud, **keyboard backup** (bottom right) opens a box to type in. Ask the visitor first: their voice goes to ElevenLabs to be transcribed.
 
 ### Act 2, optional: let them supervise
 
@@ -91,7 +91,7 @@ Handing a live situation from automation to a person is where automation tends t
 | Pearson layout | Real, from OpenStreetMap. Runs offline. |
 | Traffic, weather, responders | Synthetic. The disruptions and supervisor lines are scripted. |
 | Safety validator, readbacks, replay | Real code. Nothing moves on a clearance that was not validated and read back. Stop instructions and go-arounds act when spoken. A crew in a mayday, or with no landing clearance at 1 NM, may break off on its own authority, and the log says so. |
-| Cockpit | Speech to text and voice are live ElevenLabs. Safety intents are understood by rules in milliseconds; anything the rules do not recognise goes to an ElevenLabs agent and is labelled `llm`. The agent can only choose among allowed intents, its wording is never spoken, and the validator decides every clearance. Instruments, faults, responders and the human call are simulated. Simulated time runs up to 3x while lining up, rolling and returning. |
+| Cockpit | Speech to text and voice are live ElevenLabs. Safety intents are understood by rules in milliseconds; anything the rules do not recognise goes to an ElevenLabs agent and is labelled `llm`. The agent can only choose among allowed intents, its wording is never spoken, and the validator decides every clearance. Instruments, faults, responders and the human call are simulated. The 3D field is the real layout; the aircraft, stand vehicles, parked neighbours, surrounding city and motion are illustrative. Simulated time runs up to 12x while the aircraft moves and the pilot has nothing to say, and the screen shows the multiple. |
 | Operations controller and pilots | Rules by default, labelled `rules`. `npm run judge:live` swaps in the LLM. |
 | World decisions | 8 choices are real LLM calls (`llm`), replayed only for the identical prompt they answered: KLM643, VIR26, AAL100 and UAL1175, a controller and a pilot line each, in the first 25 seconds. Every other line is `rules`. |
 | Voice | The first two minutes of Operations are recorded ElevenLabs audio on the scripted path, including priority landing and paramedics, and three storylines in the world are too. With `judge:talk` any world line played is made live. Operations labels these `recorded voice`; World labels them `ElevenLabs`, with `cached, 0 credits` or `made live`. Later lines, and other operator choices, use a local browser voice, labelled `browser voice`. It is not ElevenLabs. |
