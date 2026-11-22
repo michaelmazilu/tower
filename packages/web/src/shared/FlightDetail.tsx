@@ -85,7 +85,7 @@ export function FlightDetail({
         </div>
         {action}
       </section>}
-      {responders && (
+      {responders && !briefing && (
         <p className="fd-responders">
           <i /><i /><i />
           <b>responders</b>

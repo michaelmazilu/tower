@@ -88,8 +88,14 @@ export interface HandoffBrief {
   now: string[];
   /** Held flights only: what the agent will and will not do if handed back. */
   onHandback: string | null;
-  /** What the agent is in the middle of saying to this flight, if anything, and whether taking over would cancel it. */
+  /** A sentence: what the agent is saying or has just had confirmed for this flight, and whether taking over would cancel it. */
   agentDoing: { text: string; cancelledByTakeover: boolean } | null;
+  /** Arrivals only: where it is on the way in, the abort point, and others landing on the same runway. Miles to the threshold. */
+  approach: { runway: string; miles: number; decisionNm: number; others: { callsign: string; miles: number }[] } | null;
+  /** One or two sentences: who is ahead and behind, and whether the runway is clear. */
+  around: string | null;
+  /** The last few moments that explain how the flight got here, oldest first, in plain words. */
+  story: { t: number; text: string }[];
 }
 
 /** [t, lat, lon, altFt, gsKt, hdg, vsFpm], ascending t. */
