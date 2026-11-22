@@ -1,6 +1,6 @@
-import type { ControlPosition } from "@towerai/contracts";
+import type { BackgroundFlight, ControlPosition } from "@towerai/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { activeAt, liveConflicts, needsPerson, nearestAt, poseAt, stateAt, urgency, type WorldIndex } from "./data";
+import { activeAt, clockText, liveConflicts, needsPerson, nearestAt, poseAt, stateAt, urgency, type WorldIndex } from "./data";
 import {
   bound,
   ease,
@@ -20,6 +20,8 @@ import type { Clock } from "./useClock";
 /** Map units across the frame when following a flight. */
 const SPAN: Record<ControlPosition, number> = { ground: 6, tower: 6, departure: 10, approach: 10, enroute: 44 };
 const HIT_PX = 24;
+/** Background dots are 2 px and packed tighter, so they need a closer click. */
+const BACKGROUND_HIT_PX = 12;
 /** At world zoom, flights this close become one count. */
 const CLUSTER_PX = 42;
 const CLUSTER_BELOW = 2.2;
@@ -55,8 +57,21 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [land, setLand] = useState<Land | null>(null);
   const [free, setFree] = useState(false);
-  const live = useRef({ clock, selected, free, onSelect });
-  live.current = { clock, selected, free, onSelect };
+  /** A background flight opened by clicking it. They have no story, so they get a small card, not the flight panel. */
+  const [picked, setPicked] = useState<BackgroundFlight | null>(null);
+  const live = useRef({ clock, selected, free, onSelect, picked: null as string | null, setPicked });
+  live.current = { clock, selected, free, onSelect, picked: picked?.id ?? null, setPicked };
+  useEffect(() => {
+    if (selected) setPicked(null);
+  }, [selected]);
+  useEffect(() => {
+    if (!picked) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPicked(null);
+    };
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [picked]);
 
   useEffect(() => {
     let mounted = true;
@@ -131,6 +146,8 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
     let frame = 0;
     let hover: string | null = null;
     let hits: { id: string; x: number; y: number; rank: number }[] = [];
+    /** Background flights on screen this frame, only once zoomed in past the clusters. */
+    let backgroundHits: { i: number; x: number; y: number }[] = [];
     let hubs: (Box & { at: XY })[] = [];
 
     const resize = new ResizeObserver(([entry]) => {
@@ -259,12 +276,22 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
       g.strokeStyle = c.g600;
       g.lineWidth = 1;
       const tails = new Path2D();
-      for (const f of shapes.background) {
+      // Background flights become clickable only once zoomed in past the clusters, and
+      // only those already on screen: the loop below culls them anyway, so this costs
+      // one push per visible dot and nothing is loaded.
+      const clickable = !selected && view.k / overview(w, h).k >= CLUSTER_BELOW;
+      const pickedId = live.current.picked;
+      backgroundHits = [];
+      let pickedAt: XY | null = null;
+      for (let i = 0; i < shapes.background.length; i++) {
+        const f = shapes.background[i]!;
         const k = (t - f.departT) / f.durationS;
         if (k < 0 || k > 1) continue;
         const [x, y] = toScreen(view, f.at(k));
         if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
         g.fillRect(x - 1, y - 1, 2, 2);
+        if (clickable) backgroundHits.push({ i, x, y });
+        if (f.id === pickedId || (clickable && f.id === hover)) pickedAt = [x, y];
         const [px, py] = toScreen(view, f.at(Math.max(0, k - 0.025)));
         if (Math.abs(px - x) > w / 2) continue;
         tails.moveTo(px, py);
@@ -273,6 +300,11 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
       g.globalAlpha = 0.8;
       g.stroke(tails);
       g.globalAlpha = 1;
+      if (pickedAt) {
+        g.strokeStyle = c.white;
+        g.lineWidth = 1;
+        g.strokeRect(pickedAt[0] - 7, pickedAt[1] - 7, 14, 14);
+      }
 
       const planes = shapes.deep
         .filter(({ f }) => f.summary.id === selected || activeAt(f, t))
@@ -515,6 +547,15 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
         .filter((p) => p.d < HIT_PX)
         // Within a cluster the pixel nearest wins, urgency breaks ties.
         .sort((a, z) => Math.round(a.d / 5) - Math.round(z.d / 5) || z.rank - a.rank)[0]?.id ?? null;
+    /** A controlled flight always wins; a background dot is hit only from closer in. */
+    const nearestBackground = (x: number, y: number) => {
+      let best: { i: number; d: number } | null = null;
+      for (const p of backgroundHits) {
+        const d = Math.hypot(p.x - x, p.y - y);
+        if (d < BACKGROUND_HIT_PX && (!best || d < best.d)) best = { i: p.i, d };
+      }
+      return best ? shapes.background[best.i]! : null;
+    };
 
     const hubAt = (x: number, y: number) => hubs.find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
     let press: { x: number; y: number; moved: boolean; from: Camera } | null = null;
@@ -540,7 +581,7 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
         cam = wanted;
         return;
       }
-      hover = nearest(x, y);
+      hover = nearest(x, y) ?? nearestBackground(x, y)?.id ?? null;
       el.style.cursor = hover || hubAt(x, y) ? "pointer" : "grab";
     };
     const up = (e: PointerEvent) => {
@@ -565,6 +606,10 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
           setFree(true);
           wanted = bound({ k: out.k * 10, x: cam.x + (hit.x - w / 2) / cam.k, y: cam.y + (hit.y - h / 2) / cam.k }, w, h);
         } else if (id) live.current.onSelect(id);
+        else {
+          // Picked straight from the recording already in memory: no request, no wait.
+          live.current.setPicked(nearestBackground(x, y));
+        }
       }
       press = null;
     };
@@ -620,11 +665,52 @@ export function WorldMap({ index, clock, selected, onSelect }: Props) {
           attention or conflict
         </span>
       </div>
+      {picked && !selected && <BackgroundCard flight={picked} epochMs={Date.parse(index.world.epoch) || 0} onClose={() => setPicked(null)} />}
       {free && (
         <button className="wv-key wv-recentre" onClick={wholeWorld}>
           {selected ? "follow flight" : "whole world"}
         </button>
       )}
+    </div>
+  );
+}
+
+const latLon = ([lat, lon]: [number, number]) =>
+  `${Math.abs(lat).toFixed(1)}°${lat < 0 ? "S" : "N"} ${Math.abs(lon).toFixed(1)}°${lon < 0 ? "W" : "E"}`;
+
+function greatCircleNm([a, b]: [number, number], [c, d]: [number, number]) {
+  const r = Math.PI / 180;
+  const h = Math.sin(((c - a) * r) / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(((d - b) * r) / 2) ** 2;
+  return 2 * 3440 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** Everything a background flight has. It is drawn for density: no radio, no decisions. */
+function BackgroundCard({ flight, epochMs, onClose }: { flight: BackgroundFlight; epochMs: number; onClose(): void }) {
+  const nm = greatCircleNm(flight.from, flight.to);
+  return (
+    <div className="wv-bgcard" role="dialog" aria-label={`Background flight ${flight.id}`}>
+      <div className="wv-bgcard-head">
+        <b>{flight.id}</b>
+        <span>background traffic</span>
+        <button className="wv-key" onClick={onClose}>
+          close
+        </button>
+      </div>
+      <dl>
+        <dt>from</dt>
+        <dd>{latLon(flight.from)}</dd>
+        <dt>to</dt>
+        <dd>{latLon(flight.to)}</dd>
+        <dt>level</dt>
+        <dd>FL{Math.round(flight.altFt / 100)}</dd>
+        <dt>distance</dt>
+        <dd>{Math.round(nm).toLocaleString()} nm</dd>
+        <dt>departs</dt>
+        <dd>{clockText(epochMs, flight.departT)}</dd>
+        <dt>arrives</dt>
+        <dd>{clockText(epochMs, flight.departT + flight.durationS)}</dd>
+      </dl>
+      <p>Synthetic traffic on a great circle. Not controlled by TowerAI, so there is no radio or decision to replay.</p>
     </div>
   );
 }

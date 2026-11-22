@@ -26,11 +26,11 @@ function fakeApi(reply: () => string, meter: () => number = () => 0) {
   return api;
 }
 
-async function fly(enabled: boolean, reply: () => string) {
+async function fly(enabled: boolean, reply: () => string, askOnRoutine = true) {
   const sim = createSimulation(SCENARIOS["guided-demo-schematic"], { radio: { controller: "simulated", pilots: "simulated" } });
   const rules = new BaselineController(sim, new ToolGateway(() => sim)).attach();
   const turns: PilotTurn[] = [];
-  const pilots = attachPilots(sim, { enabled, api: fakeApi(reply), ids, maxCalls: 8, onTurn: (t) => turns.push(t) });
+  const pilots = attachPilots(sim, { enabled, api: fakeApi(reply), ids, maxCalls: 8, askOnRoutine, onTurn: (t) => turns.push(t) });
   for (let i = 0; i < 9000; i++) {
     sim.step();
     rules.update();
@@ -55,6 +55,25 @@ test("spend is refused past the cap, before a check, and when the meter fails", 
   assert.throws(() => guard.reserve(1), SpendLimitError);
 });
 
+test("only the first meter read is waited for; later reads run behind the call", async () => {
+  let reads = 0;
+  let release!: () => void;
+  const slow = new Promise<void>((done) => (release = done));
+  const api = new ElevenLabs("test-key", 5000, async () => Response.json({}));
+  Object.assign(api, { guard: new CreditGuard(async () => {
+    if (++reads > 1) await slow;
+    return 10;
+  }, 5000, join(dir, "meter.json")) });
+  await api.prepare();
+  assert.ok(api.guard.checked);
+  api.guard.lastReadAt = -Infinity; // a minute has passed
+  let waited = true;
+  await Promise.race([api.prepare().then(() => (waited = false)), new Promise((r) => setTimeout(r, 50))]);
+  assert.equal(waited, false, "a stale meter must not hold up the call");
+  api.guard.reserve(1); // the last reading still enforces the cap meanwhile
+  release();
+});
+
 test("an agent can only pick an offered option, and is off by default", async () => {
   const options = [{ id: "a", action: "x", text: "ACA214, hold position." }];
   const prompt = { role: "pilot" as const, flightId: "ACA214", speaker: "ACA214", position: "tower" as const, context: [], history: [], options };
@@ -71,6 +90,14 @@ test("AI pilots fly the demo, then hand to rules at the budget", async () => {
   assert.deepEqual([sim.stats.departed, sim.stats.arrived], [5, 3]);
   assert.equal(turns.filter((t) => t.brain === "llm").length, 8);
   assert.equal(pilots.calls(), 8);
+});
+
+test("routine pilot turns spend nothing: one valid reply is answered by rules", async () => {
+  const { sim, turns, pilots } = await fly(true, () => '{"id":"say","reason":"as cleared"}', false);
+  assert.deepEqual([sim.stats.departed, sim.stats.arrived], [5, 3]);
+  assert.ok(turns.length > 0);
+  assert.equal(pilots.calls(), 0);
+  assert.ok(turns.every((t) => t.brain === "rules"));
 });
 
 test("a broken agent leaves the demo to the rules", async () => {
