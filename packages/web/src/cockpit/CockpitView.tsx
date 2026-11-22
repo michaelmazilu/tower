@@ -7,12 +7,12 @@ import { useCockpit } from "./useCockpit";
 import "./cockpit.css";
 
 const FAULTS: [Fault, string][] = [["engine_failure", "engine failure"], ["smoke", "smoke"], ["low_fuel", "low fuel"]];
-const VERDICT = { confirmed: "confirmed by the data", contradicted: "the data says otherwise", unverified: "cannot be verified" };
+const VERDICT = { confirmed: "The data confirms it", contradicted: "The data says otherwise", unverified: "The data can't verify it" };
 const LOW_FUEL_MIN = 30;
 const WEAK_ENGINE_PCT = 15;
 
 const red = (on: boolean) => (on ? "ck-red" : undefined);
-const seconds = (ms: number) => (ms / 1000).toFixed(2);
+const seconds = (ms: number) => (ms < 10 ? "<0.01" : (ms / 1000).toFixed(2));
 
 export default function CockpitView() {
   const pilot = useCockpit();
@@ -40,7 +40,7 @@ export default function CockpitView() {
   return (
     <div className="ck">
       <section className="ck-seat">
-        <header className={state.humanCalled ? "ck-who ck-red" : "ck-who"}>
+        <header className={state.humanCalled ? "ck-who ck-alarm" : "ck-who"}>
           <div className="ck-you">
             <small>you are the pilot of</small>
             <b>{state.callsign}</b>
@@ -98,15 +98,29 @@ function Instruments({ state: { vitals: v } }: { state: CockpitState }) {
   const failed = (pct: number, other: number) => pct < WEAK_ENGINE_PCT && (!v.onGround || other >= WEAK_ENGINE_PCT);
   return (
     <dl className="ck-dials">
-      <div><dt>{v.onGround ? "on the ground" : "altitude ft"}</dt><dd>{Math.max(0, Math.round(v.altFt)).toLocaleString("en")}</dd></div>
-      <div><dt>speed kt</dt><dd>{Math.round(v.gsKt)}</dd></div>
-      <div><dt>climb ft/min</dt><dd>{v.vsFpm > 0 ? "+" : ""}{Math.round(v.vsFpm)}</dd></div>
-      <div className={red(failed(left, right))}><dt>left engine</dt><dd>{Math.round(left)}%</dd></div>
-      <div className={red(failed(right, left))}><dt>right engine</dt><dd>{Math.round(right)}%</dd></div>
-      <div className={red(v.fuelMin < LOW_FUEL_MIN)}><dt>fuel min</dt><dd>{Math.round(v.fuelMin)}</dd></div>
-      <div className={red(v.smoke)}><dt>smoke</dt><dd>{v.smoke ? "YES" : "none"}</dd></div>
-      <div><dt>gear</dt><dd>{v.gearDown ? "down" : "up"}</dd></div>
+      <Dial label="altitude" value={Math.max(0, Math.round(v.altFt)).toLocaleString("en")} unit="ft" />
+      <Dial label="speed" value={String(Math.round(v.gsKt))} unit="kt" />
+      <Dial label="climb" value={`${v.vsFpm > 0 ? "+" : ""}${Math.round(v.vsFpm)}`} unit="fpm" />
+      <Dial label="left engine" value={String(Math.round(left))} unit="%" fill={left} alert={failed(left, right)} />
+      <Dial label="right engine" value={String(Math.round(right))} unit="%" fill={right} alert={failed(right, left)} />
+      <Dial label="fuel" value={String(Math.round(v.fuelMin))} unit="min" alert={v.fuelMin < LOW_FUEL_MIN} />
+      <Dial label="smoke" value={v.smoke ? "YES" : "none"} alert={v.smoke} />
+      <Dial label="gear" value={v.gearDown ? "down" : "up"} />
     </dl>
+  );
+}
+
+/** `fill` is a percentage, for the readings that have one. */
+function Dial({ label, value, unit, fill, alert = false }: { label: string; value: string; unit?: string; fill?: number; alert?: boolean }) {
+  return (
+    <div className={red(alert)}>
+      <dt>{label}</dt>
+      <dd>
+        {value}
+        {unit && <i>{unit}</i>}
+      </dd>
+      {fill !== undefined && <dd className="ck-gauge" aria-hidden="true"><s style={{ width: `${Math.min(100, Math.max(0, fill))}%` }} /></dd>}
+    </div>
   );
 }
 
@@ -118,7 +132,7 @@ function Radio({ pilot, state }: { pilot: ReturnType<typeof useCockpit>; state: 
   const [title, line] =
     phase === "listening" ? ["listening", "let go when done"]
     : phase === "thinking" ? ["thinking", "reading your aircraft"]
-    : phase === "speaking" ? ["tower speaking", canTalk ? "press to interrupt" : "type to interrupt"]
+    : phase === "speaking" ? ["speaking", canTalk ? "press to interrupt" : "type to interrupt"]
     : mic === "asking" ? ["allow mic", "in the browser prompt"]
     : !canTalk ? ["type instead", "speech is not available"]
     : mic === "blocked" ? ["allow mic", "or type instead"]
@@ -142,8 +156,9 @@ function Radio({ pilot, state }: { pilot: ReturnType<typeof useCockpit>; state: 
         onLostPointerCapture={release}
         onContextMenu={(e) => e.preventDefault()}
       >
+        <span className="ck-wave" aria-hidden="true">{Array.from({ length: 11 }, (_, i) => <i key={i} />)}</span>
         <b>{title}</b>
-        <span aria-live="polite">{line}</span>
+        <span className="ck-hint" aria-live="polite">{line}</span>
       </button>
       <div className="ck-say">
         <div className="ck-try">
@@ -190,16 +205,16 @@ function Latency({ last, thinking }: { last?: Exchange; thinking: boolean }) {
   ] as const;
   return (
     <dl className="ck-latency">
+      <div className="ck-total">
+        <dt>{t ? "answered in" : thinking ? "answering" : "time to answer"}</dt>
+        <dd>{t ? seconds(t.totalMs) : thinking ? "..." : "-"}{t && <i>s</i>}</dd>
+      </div>
       {parts.map(([name, ms, kind]) => (
         <div key={name.split(",")[0]}>
           <dt>{name}{kind === "modelled" && ", modelled"}</dt>
           <dd>{ms === undefined ? "-" : Math.round(ms)}{ms !== undefined && <i>ms</i>}</dd>
         </div>
       ))}
-      <div className="ck-total">
-        <dt>{t ? "answered in" : thinking ? "answering" : "time to answer"}</dt>
-        <dd>{t ? seconds(t.totalMs) : thinking ? "..." : "-"}{t && <i>s</i>}</dd>
-      </div>
     </dl>
   );
 }
@@ -210,7 +225,7 @@ function Check({ last, thinking }: { last?: Exchange; thinking: boolean }) {
     const looked = thinking ? [] : (last?.looked ?? []);
     return (
       <div className="ck-check ck-check-idle">
-        <h2>{thinking ? "checking what you said against the aircraft" : "the tower checks what you say against the aircraft"}</h2>
+        <h2>{thinking ? "checking what you said against the aircraft" : looked.length ? "what the tower looked at on your last call" : "the tower checks what you say against the aircraft"}</h2>
         {looked.length ? (
           <ul>{looked.slice(0, 6).map((fact, i) => <li key={i}>{fact}</li>)}</ul>
         ) : (
@@ -219,30 +234,29 @@ function Check({ last, thinking }: { last?: Exchange; thinking: boolean }) {
       </div>
     );
   }
+  const agree = check.evidence.filter((row) => row.agrees).length;
   return (
     <div className={`ck-check ck-check-${check.verdict}`} key={last!.id}>
-      <div className="ck-claim">
-        <small>you claimed</small>
-        <p>{check.claim}</p>
+      <div className="ck-finding">
+        <div className="ck-claim">
+          <small>you reported</small>
+          <p>{check.claim}</p>
+        </div>
+        <div className="ck-verdict">
+          <small>{agree} of {check.evidence.length} {check.evidence.length === 1 ? "reading matches" : "readings match"}</small>
+          <p>{VERDICT[check.verdict]}</p>
+          {last!.callsHuman && <span>responders alerted</span>}
+        </div>
       </div>
-      <table>
-        <thead>
-          <tr><th>the tower checked</th><th>aircraft data</th><th>matches you</th></tr>
-        </thead>
-        <tbody>
-          {check.evidence.map((row, i) => (
-            <tr key={i} className={row.agrees ? undefined : "ck-differs"}>
-              <td>{row.label}</td>
-              <td>{row.value}</td>
-              <td>{row.agrees ? "yes" : "no"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="ck-verdict">
-        {VERDICT[check.verdict]}
-        {last!.callsHuman && <span>responders alerted</span>}
-      </p>
+      <ul className="ck-evidence">
+        {check.evidence.map((row, i) => (
+          <li key={i} data-agrees={row.agrees}>
+            <small>{row.label}</small>
+            <b>{row.value}</b>
+            <em>{row.agrees ? "matches" : "differs"}</em>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -254,6 +268,13 @@ function Conversation({ canTalk, exchanges, thinking, sent }: { canTalk: boolean
     const el = list.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [newest, exchanges.length, thinking, sent]);
+  useEffect(() => {
+    // The newest line stays in view when the check above it grows.
+    const el = list.current!;
+    const keep = new ResizeObserver(() => (el.scrollTop = el.scrollHeight));
+    keep.observe(el);
+    return () => keep.disconnect();
+  }, []);
 
   return (
     <ol className="ck-talk" ref={list}>

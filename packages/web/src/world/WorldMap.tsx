@@ -10,11 +10,11 @@ import {
   overview,
   pathOf,
   project,
-  trackPoints,
   type Camera,
   type Land,
   type XY,
 } from "./geo";
+import { routeOf } from "./routes";
 import type { Clock } from "./useClock";
 
 /** Map units across the frame when following a flight. */
@@ -117,8 +117,7 @@ export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) 
       return { ...b, at };
     });
     const deep = index.flights.map((f) => {
-      const points = trackPoints(f);
-      return { f, points, path: pathOf(points) };
+      return { f, route: routeOf(index.world, f) };
     });
     const airports = index.world.airports.map((a) => ({ icao: a.icao, lat: a.lat, at: project(a.lat, a.lon) }));
     return { arcs, background, deep, airports };
@@ -293,11 +292,14 @@ export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) 
       backgroundHits = [];
       dots = [];
       let pickedAt: XY | null = null;
+      let pickedRoute: { at: (k: number) => XY; k: number } | null = null;
       for (let i = 0; i < shapes.background.length; i++) {
         const f = shapes.background[i]!;
         const k = (t - f.departT) / f.durationS;
         if (k < 0 || k > 1) continue;
         const [x, y] = toScreen(view, f.at(k));
+        // Before the culling: the line stays when its aircraft is dragged out of frame.
+        if (f.id === pickedId || (zoomedIn && f.id === hover)) pickedRoute = { at: f.at, k };
         if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
         g.fillRect(x - 1, y - 1, 2, 2);
         if (zoomedIn) backgroundHits.push({ i, x, y });
@@ -332,38 +334,86 @@ export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) 
         })
         .sort((a, z) => a.rank - z.rank);
 
-      copies(view, (shift) => {
-        place(g, view, shift);
-        for (const p of planes) {
-          if (p.id === selected) {
-            g.strokeStyle = c.g600;
-            g.lineWidth = 1.5 / view.k;
-            g.setLineDash([4 / view.k, 4 / view.k]);
-            g.stroke(p.path);
-            g.setLineDash([]);
-          } else {
-            g.strokeStyle = c.g200;
-            g.globalAlpha = selected ? 0.05 : 0.11;
-            g.lineWidth = 1 / view.k;
-            g.stroke(p.path);
-            g.globalAlpha = 1;
-          }
-        }
-      });
-
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // A to B for every flight: solid where it has been, dashed where it is going.
+      const zoom = view.k / overview(w, h).k;
       const chosen = planes.find((p) => p.id === selected);
-      if (chosen) {
-        // Flown is solid, the rest of its life is dashed.
-        const i = chosen.f.track.findIndex((p) => p[0] > t);
-        const flown = [...(i < 0 ? chosen.points : chosen.points.slice(0, i)), chosen.at];
-        copies(view, (shift) => {
-          place(g, view, shift);
+      const pointed = planes.find((p) => p.id === hover);
+      const legs = planes.map((p) => {
+        const now: [number, number] = [p.pose.lat, p.pose.lon];
+        const behind = p.route.behind(t, now, p === chosen);
+        const ahead = p.route.ahead(t, now);
+        return { p, behind, ahead, flown: pathOf(behind), togo: pathOf(ahead) };
+      });
+      // All three turns of the world: a route over the date line runs off the one it started on.
+      for (const shift of [-360, 0, 360]) {
+        place(g, view, shift);
+        for (const { p, flown, togo } of legs) {
+          const main = p === chosen || p === pointed;
+          const quiet = (!!chosen || !!pointed) && !main;
+          // Faded and close in, they are unreadable, and they are most of the frame's cost.
+          if (quiet && chosen && zoom >= 3) continue;
+          g.strokeStyle = p.red ? c.red : main ? c.white : c.g200;
+          g.lineWidth = (main ? 2 : 1.25) / view.k;
+          g.globalAlpha = main ? 1 : quiet ? 0.08 : p.red ? 0.9 : zoom < 3 ? 0.65 : 0.4;
+          g.stroke(flown);
+          // Dashing sixty long lines costs frames that close in, and undashed they would read as flown.
+          if (!main && zoom >= 12) continue;
+          g.setLineDash([4 / view.k, 4 / view.k]);
+          g.globalAlpha = main ? 0.85 : quiet ? 0.06 : p.red ? 0.8 : zoom < 3 ? 0.5 : 0.3;
+          g.stroke(togo);
+          g.setLineDash([]);
+        }
+        if (pickedRoute) {
+          const { at, k } = pickedRoute;
+          const part = (a: number, b: number) => pathOf(Array.from({ length: 49 }, (_, i) => at(a + ((b - a) * i) / 48)));
+          g.globalAlpha = 1;
           g.strokeStyle = c.white;
           g.lineWidth = 1.5 / view.k;
-          g.stroke(pathOf(flown));
-        });
-        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+          g.stroke(part(0, k));
+          g.setLineDash([4 / view.k, 4 / view.k]);
+          g.stroke(part(k, 1));
+          g.setLineDash([]);
+        }
+      }
+      g.globalAlpha = 1;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const ends: { text: string; x: number; y: number }[] = [];
+      if (zoom < 3 || chosen || pointed) {
+        for (const { p, behind, ahead } of legs) {
+          const main = p === (pointed ?? chosen);
+          if ((chosen || pointed) && !main) continue;
+          g.fillStyle = p.red ? c.red : c.white;
+          const side = main ? 8 : 4;
+          for (const at of [behind[0], ahead[ahead.length - 1]]) {
+            if (!at) continue;
+            const [x, y] = toScreen(view, at);
+            g.fillRect(x - side / 2, y - side / 2, side, side);
+          }
+          if (!main) continue;
+          // Where an end is out of frame, its name sits where the line leaves the frame.
+          const mark = (points: XY[], text: string) => {
+            const onScreen = points.map((at) => toScreen(view, at));
+            for (let i = 0; i < onScreen.length; i++) {
+              let [x, y] = onScreen[i]!;
+              const inside = ([a, b]: XY) => a >= 0 && b >= 0 && a <= w && b <= h;
+              if (!inside([x, y])) {
+                const next = onScreen[i + 1];
+                if (!next || !inside(next)) continue;
+                // Walk back along the segment from the point that is in frame to the edge.
+                let k = 1;
+                if (x < 0) k = Math.min(k, next[0] / (next[0] - x));
+                if (x > w) k = Math.min(k, (w - next[0]) / (x - next[0]));
+                if (y < 0) k = Math.min(k, next[1] / (next[1] - y));
+                if (y > h) k = Math.min(k, (h - next[1]) / (y - next[1]));
+                [x, y] = [next[0] + (x - next[0]) * k, next[1] + (y - next[1]) * k];
+              }
+              ends.push({ text, x, y });
+              return;
+            }
+          };
+          mark(behind, `from ${p.route.from}`);
+          mark([...ahead].reverse(), `to ${p.route.to(t)}`);
+        }
       }
 
       const near = chosen && activeAt(chosen.f, t) && nearestAt(index, chosen.f, t);
@@ -395,7 +445,6 @@ export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) 
         g.stroke();
       }
 
-      const zoom = view.k / overview(w, h).k;
       const size = Math.min(1, Math.max(0.75, zoom / 2.5));
       const folded = new Set<string>();
       hubs = [];
@@ -510,6 +559,20 @@ export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) 
         g.fillText(words, box.x + cw + 6, box.y + 13.5);
       }
       g.font = `12px ${mono}`;
+      for (const { text, x, y } of ends) {
+        const bw = g.measureText(text).width + 10;
+        const plane = pointed ?? chosen!;
+        const body = { x: plane.x - 38, y: plane.y - 36, w: 76, h: 60 };
+        const spot = [0, -22, 22, -44, 44, -66, 66]
+          .map((dy) => ({ x: Math.max(6, Math.min(w - bw - 6, x - bw / 2)), y: Math.max(6, Math.min(h - 44, y - 24 + dy)), w: bw, h: 18 }))
+          .find((s) => !overlaps(body, s) && !boxes.some((o) => overlaps(o, s)));
+        if (!spot) continue;
+        boxes.push(spot);
+        g.fillStyle = c.white;
+        g.fillRect(spot.x, spot.y, spot.w, spot.h);
+        g.fillStyle = c.black;
+        g.fillText(text, spot.x + 5, spot.y + 9.5);
+      }
       for (let i = planes.length - 1; i >= 0; i--) {
         const p = planes[i]!;
         if (folded.has(p.id)) continue;
@@ -677,6 +740,10 @@ export function WorldMap({ index, clock, selected, speaking, onSelect }: Props) 
         <span>
           <i className="arrow" />
           agent controlled
+        </span>
+        <span>
+          <i className="route" />
+          flown, then to go
         </span>
         {!selected && (
           <span>

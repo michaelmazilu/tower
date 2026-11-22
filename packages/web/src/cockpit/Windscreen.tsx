@@ -3,7 +3,7 @@ import type { CockpitState } from "@towerai/contracts";
 import type { AirportData, Vec2 } from "@towerai/core";
 
 /*
- * A forward schematic of the real field: one pinhole camera, flat shapes, four greys.
+ * A forward schematic of the real field at night: one pinhole camera, flat shapes, greys and white lights.
  * The eye sits higher than a real cockpit so that the pavement ahead can be read from across a room.
  */
 
@@ -17,6 +17,14 @@ const COMPASS: Record<number, string> = { 0: "N", 90: "E", 180: "S", 270: "W" };
 type P3 = [x: number, y: number, up: number];
 interface Shape { points: Vec2[]; at: Vec2; heightM: number }
 interface Mark { points: Vec2[]; at: Vec2 }
+
+/** Where the glass starts below the heading tape. */
+const TAPE_H = 38;
+/** The same every frame and every visit: far-off lights, by compass bearing. */
+const SKYLINE = Array.from({ length: 540 }, (_, i) => {
+  const r = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;
+  return { bearing: (i * 137.508) % 360, up: r * r * 5, bright: r > 0.8 };
+});
 
 const middle = (points: Vec2[]): Vec2 => ({
   x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
@@ -58,7 +66,13 @@ function build(airport: AirportData) {
         for (const a of [10, len - 45]) paint.push(mark(strip(from, to, 2.6, a, a + 35, side * (5 + i * 6.2))));
       }
     }
-    return { from, to, ends: runway.ends, surface: strip(from, to, w), paint };
+    const ux = (to.x - from.x) / len;
+    const uy = (to.y - from.y) / len;
+    const lights: Vec2[] = [];
+    const light = (along: number, off: number) => lights.push({ x: from.x + ux * along + uy * off, y: from.y + uy * along - ux * off });
+    for (let a = 0; a <= len; a += 30) for (const side of [-1, 1]) light(a, side * (w / 2 + 3));
+    for (let off = -w / 2; off <= w / 2; off += 5) for (const a of [-3, len + 3]) light(a, off);
+    return { from, to, ends: runway.ends, surface: strip(from, to, w), paint, lights };
   });
   const solids: Shape[] = [
     ...(d?.buildings ?? []).map((b) => ({ points: b.polygon, heightM: b.heightM })),
@@ -166,48 +180,90 @@ export function Windscreen({ airport, state }: { airport: AirportData; state: Co
         }
       };
 
-      g.fillStyle = c.g200;
+      g.fillStyle = c.g800;
       g.fillRect(0, 0, W, H);
-      g.fillStyle = c.black;
+      g.fillStyle = c.g900;
       g.fillRect(0, horizon, W, H - horizon);
 
-      // A grid on the ground, or there is no sense of speed once the field is behind.
-      const step = eye > 400 ? 1000 : 250;
-      g.beginPath();
-      for (let i = -16; i <= 16; i++) {
-        const gx = (Math.round(me.x / step) + i) * step;
-        const gy = (Math.round(me.y / step) + i) * step;
-        flat([{ x: gx, y: me.y - 16 * step }, { x: gx, y: me.y + 16 * step }], false);
-        flat([{ x: me.x - 16 * step, y: gy }, { x: me.x + 16 * step, y: gy }], false);
+      // Once airborne, a grid on the ground, or there is no sense of speed when the field is behind.
+      if (me.alt > 20) {
+        const step = eye > 400 ? 1000 : 250;
+        g.beginPath();
+        for (let i = -16; i <= 16; i++) {
+          const gx = (Math.round(me.x / step) + i) * step;
+          const gy = (Math.round(me.y / step) + i) * step;
+          flat([{ x: gx, y: me.y - 16 * step }, { x: gx, y: me.y + 16 * step }], false);
+          flat([{ x: me.x - 16 * step, y: gy }, { x: me.x + 16 * step, y: gy }], false);
+        }
+        g.strokeStyle = c.g800;
+        g.lineWidth = 1;
+        g.stroke();
       }
-      g.strokeStyle = c.g800;
-      g.lineWidth = 1;
-      g.stroke();
+
+      g.fillStyle = c.g600;
+      g.fillRect(0, horizon, W, 1);
+      for (const l of SKYLINE) {
+        const off = ((l.bearing - me.hdg + 540) % 360) - 180;
+        if (Math.abs(off) > 65) continue;
+        g.fillStyle = l.bright ? c.g200 : c.g600;
+        g.fillRect(W / 2 + Math.tan(off * RAD) * focal, horizon - l.up, l.bright ? 2 : 1.5, l.bright ? 2 : 1.5);
+      }
 
       fill(c.g900, field.aprons);
       fill(c.g800, field.taxiways.filter((m) => seen(m.at)).map((m) => m.points));
       g.beginPath();
       for (const m of field.centres) if (seen(m.at, 900 + eye * 2)) flat(m.points, false);
-      g.strokeStyle = c.g400;
-      g.lineWidth = 1.5;
+      g.strokeStyle = c.g600;
+      g.lineWidth = 1;
+      g.setLineDash([2, 7]);
       g.stroke();
+      g.setLineDash([]);
+
       fill(c.g600, field.runways.map((r) => r.surface));
       fill(c.white, field.runways.flatMap((r) => r.paint.filter((m) => seen(m.at)).map((m) => m.points)));
+      for (const r of field.runways) {
+        g.fillStyle = r.ends.some((e) => e.designator === s.runway) ? c.white : c.g400;
+        for (const p of r.lights) {
+          const f = ahead(p);
+          if (f < NEAR_M || !seen(p)) continue;
+          const [x, y] = screen([(p.x - me.x) * cos - (p.y - me.y) * sin, f, 0.5 - eye]);
+          const size = Math.max(1.2, Math.min(3.5, (0.7 / f) * focal));
+          g.fillRect(x - size / 2, y - size / 2, size, size);
+        }
+      }
 
       const solids = field.solids.filter((b) => seen(b.at)).sort((a, b) => ahead(b.at) - ahead(a.at));
       g.lineWidth = 1;
-      g.strokeStyle = c.g400;
       for (const b of solids) {
-        g.fillStyle = ahead(b.at) > 1400 ? c.g600 : c.g800;
-        b.points.forEach((p, i) => {
-          const q = b.points[(i + 1) % b.points.length]!;
+        const walls = b.points
+          .map((from, i) => ({ from, to: b.points[(i + 1) % b.points.length]! }))
+          .sort((a, z) => ahead(z.from) + ahead(z.to) - ahead(a.from) - ahead(a.to));
+        // Far to near, so the windows of a back wall are covered by the front one.
+        for (const { from, to } of walls) {
+          g.fillStyle = c.black;
           g.beginPath();
-          trace([[p.x, p.y, 0], [q.x, q.y, 0], [q.x, q.y, b.heightM], [p.x, p.y, b.heightM]]);
+          trace([[from.x, from.y, 0], [to.x, to.y, 0], [to.x, to.y, b.heightM], [from.x, from.y, b.heightM]]);
           g.fill();
-        });
+          const n = Math.min(24, Math.floor(Math.hypot(to.x - from.x, to.y - from.y) / 16));
+          g.fillStyle = c.g400;
+          for (let up = 5; up < b.heightM; up += 8) {
+            for (let i = 1; i <= n; i++) {
+              if ((i * 7 + up * 3 + Math.round(Math.abs(from.x))) % 5 < 2) continue;
+              const x = from.x + ((to.x - from.x) * i) / (n + 1);
+              const y = from.y + ((to.y - from.y) * i) / (n + 1);
+              const f = (x - me.x) * sin + (y - me.y) * cos;
+              if (f < 30) continue;
+              const [sx, sy] = screen([(x - me.x) * cos - (y - me.y) * sin, f, up - eye]);
+              const size = Math.max(1, Math.min(3, (1.5 / f) * focal));
+              g.fillRect(sx, sy, size, size);
+            }
+          }
+        }
+        g.fillStyle = c.black;
         g.beginPath();
         trace(b.points.map((p): P3 => [p.x, p.y, b.heightM]));
         g.fill();
+        g.strokeStyle = c.g600;
         g.stroke();
       }
 
@@ -244,33 +300,56 @@ export function Windscreen({ airport, state }: { airport: AirportData; state: Co
         if (p[1] < 30) continue;
         const [x, y] = screen(p);
         if (x < 30 || x > W - 30) continue;
-        const top = Math.max(64, Math.min(y, horizon) - 34);
+        const top = Math.max(TAPE_H + 30, Math.min(y, horizon) - 44);
         g.fillStyle = c.red;
-        g.fillRect(x - 1, top, 2, y - top);
+        g.fillRect(x - 0.5, top, 1, y - top);
+        g.fillRect(x - 4, y - 4, 8, 8);
         tag(`runway ${end.designator}`, x, top, c.red, c.white, 14);
+      }
+
+      // The aircraft around the glass: posts either side, the glareshield below.
+      const post = Math.round(W * 0.045);
+      const shield = Math.max(22, Math.round(H * 0.07));
+      const shape = (...points: [number, number][]) => {
+        g.beginPath();
+        points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+        g.closePath();
+        g.fill();
+      };
+      g.fillStyle = c.black;
+      g.fillRect(0, 0, W, TAPE_H);
+      shape([0, TAPE_H], [post * 0.3, TAPE_H], [post, H], [0, H]);
+      shape([W, TAPE_H], [W - post * 0.3, TAPE_H], [W - post, H], [W, H]);
+      const sill = H - shield;
+      shape([0, H], [0, sill + 10], [W * 0.2, sill + 10], [W * 0.26, sill], [W * 0.74, sill], [W * 0.8, sill + 10], [W, sill + 10], [W, H]);
+
+      // The horizon reference.
+      g.fillStyle = c.g200;
+      for (const side of [-1, 1]) {
+        g.fillRect(W / 2 + side * 34 - 14, horizon, 28, 2);
+        g.fillRect(W / 2 + side * 20 - 1, horizon, 2, 7);
       }
 
       // Heading tape.
       const px = W / 70;
-      g.fillStyle = c.white;
-      g.fillRect(0, 0, W, 38);
       for (let d = Math.ceil((me.hdg - 36) / 5) * 5; d <= me.hdg + 36; d += 5) {
         const x = W / 2 + (d - me.hdg) * px;
         const major = d % 15 === 0;
-        g.fillStyle = c.black;
-        g.fillRect(x, 38 - (major ? 10 : 5), 1, major ? 10 : 5);
-        if (!major) continue;
+        g.fillStyle = major ? c.g200 : c.g600;
+        g.fillRect(x, TAPE_H - (major ? 9 : 5), 1, major ? 9 : 5);
+        if (!major || Math.abs(x - W / 2) < 36) continue;
         const deg = ((d % 360) + 360) % 360;
-        g.font = `700 13px ${FONT}`;
-        g.fillText(COMPASS[deg] ?? String(deg).padStart(3, "0"), x, 14);
+        g.font = `700 12px ${FONT}`;
+        g.fillStyle = c.g400;
+        g.fillText(COMPASS[deg] ?? String(deg).padStart(3, "0"), x, 15);
       }
-      tag(String(Math.round(((me.hdg % 360) + 360) % 360) % 360).padStart(3, "0"), W / 2, 19, c.black, c.white, 20);
+      tag(String(Math.round(((me.hdg % 360) + 360) % 360) % 360).padStart(3, "0"), W / 2, 19, c.white, c.black, 18);
 
       // Where that is on the field, heading up.
-      const size = Math.min(190, Math.round(H * 0.46));
+      const size = Math.min(150, Math.round(Math.min(W * 0.24, H * 0.36)));
       if (size < 90) return;
-      const left = W - size - 12;
-      const top = 50;
+      const left = W - post - size - 8;
+      const top = TAPE_H + 12;
       const range = Math.max(1500, Math.min(12_000, Math.hypot(me.x, me.y) * 0.75));
       const k = size / 2 / range;
       g.save();

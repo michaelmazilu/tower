@@ -398,6 +398,8 @@
 .wv-stage { position: relative; }
 .wv .wv-hear.over { position: absolute; z-index: 3; top: 12px; left: 12px; height: 56px; padding: 0 20px; }
 
+.wv-legend i.route { position: relative; width: 22px; height: 2px; background: none; border-top: 2px dashed currentColor; }
+.wv-legend i.route::before { content: ""; position: absolute; left: 0; top: -2px; width: 11px; height: 2px; background: currentColor; }
 /* A clicked background flight. Small on purpose: it has no story to tell. */
 .wv-bgcard {
   position: absolute;
