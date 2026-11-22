@@ -1,0 +1,15 @@
+# Never ship keys or local state into the image.
+.env
+.env.*
+!.env.example
+packages/server/data/agents.json
+packages/server/data/usage.json
+packages/server/data/runs/
+packages/server/data/audio/live/
+node_modules/
+**/node_modules/
+**/dist/
+.git/
+.claude/
+*.log
+.DS_Store

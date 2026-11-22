@@ -315,6 +315,80 @@ export class Ops {
     return { ok: true, message: `You have ${ac.callsign}. Sent: ${said.join(" ")}` };
   }
 
+  /**
+   * "Ask the agent": a plain answer about one flight, from the same rule-built
+   * briefing the card shows. No model is involved, so it works offline and can
+   * never say something the card does not.
+   */
+  ask(id: string, question: string): Result {
+    const ac = this.sim.get(id.toUpperCase());
+    const h = this.flights.get(id.toUpperCase());
+    if (!ac || !h) return { ok: false, message: `${id} is no longer here.` };
+    const q = question.toLowerCase();
+    const cs = ac.callsign;
+    const b = h.record.summary.brief;
+    const said = (lines: string[]) => ({ ok: true, message: lines.filter(Boolean).join(" ") });
+    if (!b) return said([`${cs} is ${h.record.summary.status}.`, "The agent has it and nothing needs you right now."]);
+    const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+    // "it has to abort the landing" reads "DLH471 has to abort the landing" after a callsign.
+    const then = b.deadline?.then.replace(/^it /, "") ?? "";
+    const steps = b.recommend.map((r, i) => `${i + 1}. ${r.label}: ${r.why}.`);
+    const plan = steps.length ? ["I would:", ...steps] : b.agentDoing ? [b.agentDoing.text, "Nothing else is needed from you right now."] : ["There is no single answer here; take over and choose."];
+
+    if (/\bwhy\b|reason|explain/.test(q)) {
+      return said([`${b.problem}. ${b.context}`, ...(steps.length ? ["That is why I suggest:", ...steps] : plan)]);
+    }
+    if (/hand(ing)?( it)? ?back|give (it )?back|let go/.test(q)) {
+      return said([b.onHandback ?? `If you take over and then hand it back: ${this.onHandback(ac)}`]);
+    }
+    if (/wait|nothing|do not|don't|dont|ignore/.test(q)) {
+      return said([
+        b.deadline ? `If nobody acts, in about ${clock(b.deadline.inS)} ${cs} ${then}.` : "Nothing forces the pace right now.",
+        b.agentDoing ? b.agentDoing.text : h.record.summary.attention === "human_control" ? "You have control, so the agent will not step in." : "Until you take over, I keep handling it.",
+      ]);
+    }
+    if (/how long|time|minute|second|deadline|clock/.test(q)) {
+      return said([b.deadline ? `You have about ${clock(b.deadline.inS)} to decide; after that ${cs} ${then}.` : "There is no clock on this one right now."]);
+    }
+    if (/around|traffic|ahead|behind|other plane|clear|runway/.test(q)) {
+      return said([b.around ?? `${b.context}`]);
+    }
+    if (/happen(ed)?|so far|story|before|how did|history/.test(q)) {
+      return said(b.story.length ? b.story.map((x) => `${clock(x.t)} ${x.text}.`) : ["Nothing notable has happened on this flight yet."]);
+    }
+    if (/paramedic|medic|fire|rescue|responder|ambulance/.test(q)) {
+      return said([h.medicsAlerted ? `Paramedics are on their way to gate ${ac.gate}.` : h.escalation ? "Paramedics have not been called yet." : "No responders are involved with this flight."]);
+    }
+    if (/who|control|in charge/.test(q)) return said([b.now[0] ?? ""]);
+    if (/what|should|do|next|now|suggest|recommend|help/.test(q)) return said([...b.now.slice(1), ...plan]);
+    return said([`${b.problem}. ${b.context}`, "You can ask me: why, what should I do, how long do I have, what is around it, what if we wait, or what if you hand it back."]);
+  }
+
+  /**
+   * The tower agent's chat, for Maritime's POST /chat and anyone else: the
+   * same answers as "Ask the agent", about the flight the message names, or
+   * about the flight that most needs a person, or about the airport as a whole.
+   */
+  chat(message: string): string {
+    const words = message.toUpperCase();
+    const flights = [...this.flights.values()].filter((h) => !h.left).map((h) => h.record.summary);
+    const named = flights.find((f) => new RegExp(`\\b(${f.id}|${f.callsign})\\b`).test(words));
+    const needing = flights
+      .filter((f) => f.brief)
+      .sort((a, b) => ATTENTION_RANK[b.attention] - ATTENTION_RANK[a.attention] || b.risk.score - a.risk.score);
+    const flight = named ?? (/\b(airport|overall|summary|status|everything|all flights)\b/i.test(message) ? undefined : needing[0]);
+    if (!flight) {
+      const list = needing.map((f) => `${f.callsign} (${f.brief!.problem.toLowerCase()})`);
+      return [
+        `Toronto Pearson, ${Math.floor(this.sim.time / 60)}:${String(Math.floor(this.sim.time % 60)).padStart(2, "0")} into the run: ${flights.length} flights.`,
+        list.length ? `${list.length} need${list.length === 1 ? "s" : ""} a person: ${list.join(", ")}.` : "Nothing needs a person; the agent has every flight.",
+        "Name a flight, for example \"why is DLH471 red?\", and I will brief you on it.",
+      ].join(" ");
+    }
+    const answer = this.ask(flight.id, message).message ?? "";
+    return named ? answer : `${flight.callsign} needs you most right now. ${answer}`;
+  }
+
   // ------------------------------------------------------------- the briefing
 
   /** Clearances the agent decided but has not said. Taking over withdraws them. */

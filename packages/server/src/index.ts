@@ -286,6 +286,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (await handleCockpit(cockpit, req, res, path)) return;
   }
 
+  // Maritime's agent contract: {"message": "..."} in, {"response": "..."} out within 30 s.
+  // It only answers questions about the live picture and changes nothing, so it needs no secret.
+  if (method === "POST" && path === "/chat") {
+    const body = await readJson(req);
+    return send(res, 200, { response: host.ops.chat(typeof body.message === "string" ? body.message.slice(0, 500) : "") });
+  }
+
   if (method === "POST") {
     authorize(req);
     if (path === "/api/world/voice") return send(res, 200, await worldVoice(await readJson(req), talkApi));
@@ -322,12 +329,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     }
     const ack = /^\/api\/ops\/alerts\/([^/]+)\/ack$/.exec(path);
     if (ack) return acted(res, host.ops.acknowledge(decoded(ack[1])));
-    const action = /^\/api\/ops\/flights\/([^/]+)\/(takeover|handback|instruct|accept)$/.exec(path);
+    const action = /^\/api\/ops\/flights\/([^/]+)\/(takeover|handback|instruct|accept|ask)$/.exec(path);
     if (action) {
       const id = decoded(action[1]);
       if (action[2] === "takeover") return acted(res, host.ops.takeover(id));
       if (action[2] === "handback") return acted(res, host.ops.handback(id));
       const body = await readJson(req);
+      // A question changes nothing, so it answers without a broadcast.
+      if (action[2] === "ask") return send(res, 200, host.ops.ask(id, typeof body.question === "string" ? body.question.slice(0, 300) : ""));
       if (action[2] === "accept") {
         const steps = Array.isArray(body.steps) ? body.steps.filter((x): x is string => typeof x === "string").slice(0, 4) : [];
         return acted(res, host.ops.accept(id, steps));

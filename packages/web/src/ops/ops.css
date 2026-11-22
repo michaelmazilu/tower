@@ -304,3 +304,20 @@
 .ask-radio-mode .ask-clock { padding: 6px 14px; }
 .ask-radio-mode .ask-clock b { font-size: 22px; }
 .ask-radio-mode .ask-clock span { display: none; }
+/* Ask the agent (assistant-ui): same look as the radio log, a chat filling the panel. */
+.askai { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.askai-view { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+.askai-empty { margin: 0; font-size: 14px; line-height: 1.4; color: var(--grey-600); }
+.askai-msg { max-width: 92%; padding: 8px 12px; border: 1px solid var(--grey-200); font-size: 15px; line-height: 1.4; }
+.askai-msg > b { display: block; margin-bottom: 2px; font-size: 12px; }
+.askai-msg p { margin: 0; }
+.askai-you { align-self: flex-end; background: var(--black); border-color: var(--black); color: var(--white); }
+.askai-agent { align-self: flex-start; background: var(--grey-100); }
+.askai-suggest { flex: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px 0; border-top: var(--line); }
+.askai-chip { height: 28px; padding: 0 10px; border: 1px solid var(--black); background: var(--white); color: var(--black); font: 700 12px var(--sans); cursor: pointer; }
+.askai-chip:hover { background: var(--black); color: var(--white); }
+.askai-composer { flex: none; display: flex; gap: 8px; padding: 8px 16px 12px; }
+.askai-input { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--grey-400); background: var(--white); color: var(--black); font: 14px var(--sans); resize: none; }
+.askai-send { height: 38px; padding: 0 16px; border: 0; background: var(--black); color: var(--white); font: 700 14px var(--sans); cursor: pointer; }
+.askai-send:disabled { opacity: 0.4; cursor: default; }
+.askai-loading { padding: 12px 16px; }

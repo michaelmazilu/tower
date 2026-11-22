@@ -193,6 +193,24 @@ describe("live operations", () => {
     expect(story.slice(-3)).toEqual(["You took over", "You gave it priority to land on 23", "You called paramedics to gate 173"]);
   });
 
+  it("answers 'Ask the agent' from the same briefing the card shows", () => {
+    const host = demo();
+    host.stepOnce(450);
+    const answer = (q: string) => host.ops.ask("DLH471", q).message!;
+    expect(answer("Why?")).toMatch(/^Passenger medical emergency\. Landing on runway 23.*Give it priority to land on 23/);
+    expect(answer("What if we wait?")).toMatch(/^If nobody acts, in about \d+:\d\d DLH471 has to abort the landing\. Until you take over, I keep handling it\.$/);
+    expect(answer("What if I hand it back?")).toMatch(/clear it to land on 23/);
+    expect(answer("What's around it?")).toMatch(/^Nothing is ahead of it to runway 23\./);
+    expect(answer("tell me a joke")).toMatch(/You can ask me: why, what should I do/);
+    expect(host.ops.ask("ZZZ999", "why").ok).toBe(false);
+    // Maritime's POST /chat: the same answers, about the named flight or the one that needs a person most.
+    expect(host.ops.chat("why is DLH471 red?")).toBe(answer("why is DLH471 red?"));
+    expect(host.ops.chat("what needs me?")).toMatch(/^DLH471 needs you most right now\./);
+    expect(host.ops.chat("airport status")).toMatch(/^Toronto Pearson, .* flights\. 1 needs a person: DLH471 \(passenger medical emergency\)/);
+    // Asking changes nothing.
+    expect(host.sim.get("DLH471")!.humanControl).toBeFalsy();
+  });
+
   it("warns before handback when help the agent will not call has not been called", () => {
     const host = demo();
     host.stepOnce(450);

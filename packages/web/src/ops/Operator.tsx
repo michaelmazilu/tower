@@ -1,6 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FlightSummary, Message, OperatorInstruction } from "@towerai/contracts";
 import { clock, needsHuman } from "../shared/replay";
+// assistant-ui is loaded only when someone opens "Ask the agent", so the demo's first load stays small.
+const AskAgent = lazy(() => import("./AskAgent").then((m) => ({ default: m.AskAgent })));
 import { get, post } from "./useOps";
 
 type Action = { clearanceType: string; label: string };
@@ -89,7 +91,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).
 export function NeedsYou({ flight, operator, heldAlerts, messages, responders }: {
   flight: FlightSummary; operator: Operator; heldAlerts: number; messages: Message[]; responders: string | null;
 }) {
-  const [view, setView] = useState<"brief" | "radio">("brief");
+  const [view, setView] = useState<"brief" | "radio" | "ask">("brief");
   const b = flight.brief;
   if (!b) return null;
   const held = flight.attention === "human_control";
@@ -98,7 +100,7 @@ export function NeedsYou({ flight, operator, heldAlerts, messages, responders }:
   const n = b.recommend.length;
   const said = heard(messages);
   return (
-    <section className={`ask ${held ? "ask-held" : ""} ${view === "radio" ? "ask-radio-mode" : ""}`} aria-label={`${flight.callsign} needs you`}>
+    <section className={`ask ${held ? "ask-held" : ""} ${view !== "brief" ? "ask-radio-mode" : ""}`} aria-label={`${flight.callsign} needs you`}>
       <div className="ask-top">
         <div className="ask-what">
           <small>{held ? `You are handling ${flight.callsign}` : `${flight.callsign} needs you`}</small>
@@ -116,6 +118,7 @@ export function NeedsYou({ flight, operator, heldAlerts, messages, responders }:
       <div className="ask-tabs" role="tablist">
         <button role="tab" aria-selected={view === "brief"} onClick={() => setView("brief")}>{held ? "Your flight" : "What to do"}</button>
         <button role="tab" aria-selected={view === "radio"} onClick={() => setView("radio")}>Radio log <span>{said.length}</span></button>
+        <button role="tab" aria-selected={view === "ask"} onClick={() => setView("ask")}>Ask the agent</button>
       </div>
 
       {view === "brief" && <>
@@ -191,6 +194,11 @@ export function NeedsYou({ flight, operator, heldAlerts, messages, responders }:
       </>}
 
       {view === "radio" && <RadioLog callsign={flight.callsign} said={said} />}
+      {view === "ask" && (
+        <Suspense fallback={<p className="askai-empty askai-loading">Opening the chat…</p>}>
+          <AskAgent flightId={flight.id} callsign={flight.callsign} />
+        </Suspense>
+      )}
     </section>
   );
 }

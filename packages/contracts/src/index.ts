@@ -263,6 +263,8 @@ export interface OperatorInstruction {
  *   GET  /api/ops/flights/:id/actions         { actions: { clearanceType, label }[] } valid operator choices now
  *   POST /api/ops/flights/:id/takeover        { ok, message? }
  *   POST /api/ops/flights/:id/instruct        OperatorInstruction -> { ok, message? }
+ *   POST /api/ops/flights/:id/ask             { question } -> { ok, message }: a plain answer from the
+ *                                             flight's briefing, by rules (no model), for "Ask the agent"
  *   POST /api/ops/flights/:id/accept          { steps: clearanceType[] } -> { ok, message? }; takes control if
  *                                             needed, then sends the agent's recommendation as shown, or refuses
  *                                             if it has changed since

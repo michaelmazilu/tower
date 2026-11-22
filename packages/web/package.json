@@ -8,6 +8,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@assistant-ui/react": "0.15.36",
     "@towerai/contracts": "*",
     "@towerai/core": "*",
     "d3-geo": "^3.1.2",
