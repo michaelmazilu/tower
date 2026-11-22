@@ -65,7 +65,9 @@ The same chat works from the agent's page in the Maritime dashboard. Redeploy af
 - **Never add `ELEVENLABS_API_KEY` to a public agent.** `.env` is git-ignored and in `.dockerignore`, so it
   is never in the image.
 - **First visit after a sleep** waits about a second while the machine wakes.
-- **Not verified on Maritime itself yet.** Docker is not installed on the build laptop, so the image was not
-  built locally. A clean install and build of exactly the committed files was run, and the server was started
-  with the image's settings and checked as Maritime would call it: `/health` 200 under an `*.mtm.sh` host,
-  `/chat` in the documented shape, the page and its WebSocket accepted, a cross-site POST refused.
+- **Verified live on Maritime** (22 Nov 2026, agent `towerai`, built from `feat/ask-the-agent-assistant-ui`):
+  the build took about 3 minutes; on the public `https://<agent-id>.mtm.sh/` URL, `/health` returned 200, the
+  page and its web bundle loaded, the operations screen showed "tower link: live" with the sim clock moving
+  (so the WebSocket works), **restart** worked, the **Ask the agent** tab answered "Why?" for DLH471, and
+  `maritime chat towerai "what needs me?"` returned the tower agent's answer. `maritime agents get` needs the
+  agent's id, not its name; `maritime chat` accepts either.
