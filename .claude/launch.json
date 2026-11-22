@@ -6,6 +6,21 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start"],
       "port": 8787
+    },
+    {
+      "name": "towerai-judge",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "packages/server/src/index.ts"],
+      "port": 8787,
+      "env": {
+        "ELEVENLABS_API_KEY": "",
+        "TOWERAI_CONTROLLER": "baseline",
+        "TOWERAI_AI_PILOTS": "off",
+        "TOWERAI_SCENARIO": "judge-demo",
+        "TOWERAI_DATA_DIR": "off",
+        "TOWERAI_RADIO_CONTROLLER": "simulated",
+        "TOWERAI_RADIO_PILOTS": "simulated"
+      }
     }
   ]
 }
