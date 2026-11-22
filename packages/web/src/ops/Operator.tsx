@@ -253,7 +253,9 @@ function RadioLog({ callsign, said, preview, onOpen }: { callsign: string; said:
         {shown.length === 0 && <li className="ask-radio-empty">Nothing said yet.</li>}
         {shown.map((m) => {
           const who = m.from === "pilot" ? "pilot" : m.from === "operator" ? "you" : "agent";
-          const name = who === "pilot" ? `${callsign} (pilot)` : who === "you" ? "You" : `Agent, ${m.speaker}`;
+          // Responders answer on the same log, but they are people on the ground, not the agent.
+          const responder = who === "agent" && /paramedic|fire|rescue/i.test(m.speaker);
+          const name = who === "pilot" ? `${callsign} (pilot)` : who === "you" ? "You" : responder ? m.speaker : `Agent, ${m.speaker}`;
           const audio = m.audioUrl?.startsWith("/") && !m.audioUrl.startsWith("//") ? m.audioUrl : undefined;
           return (
             <li key={m.id} className={`ask-msg ask-msg-${who}`}>
@@ -263,7 +265,8 @@ function RadioLog({ callsign, said, preview, onOpen }: { callsign: string; said:
                 {audio && <button onClick={() => void new Audio(audio).play().catch(() => undefined)}>play</button>}
               </div>
               <p>{m.text}</p>
-              {!preview && m.decision?.reason && who !== "pilot" && <p className="ask-msg-why">Why: {m.decision.reason}</p>}
+              {/* A reason is worth reading on a decision about this flight, not on an all-stations broadcast. */}
+              {!preview && m.decision?.reason && who === "agent" && !responder && m.kind !== "advisory" && <p className="ask-msg-why">Why: {m.decision.reason}</p>}
             </li>
           );
         })}

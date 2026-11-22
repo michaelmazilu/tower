@@ -28,7 +28,23 @@ export interface FlightDetailProps {
   controls?: ReactNode;
   /** When a person is needed: replaces the status band and the numbers with what to do. */
   briefing?: ReactNode;
+  /** Plain words in the status band: no risk score, no internal labels. */
+  plain?: boolean;
 }
+
+const PLAIN_WORDS: Record<FlightRecord["summary"]["attention"], string> = {
+  none: "agent handling",
+  monitor: "agent handling",
+  intervene: "needed you",
+  human_requested: "pilot asked for you",
+  human_control: "you had control",
+};
+
+/** "human: medical" is shorthand for a box; in plain words it is "Medical". */
+const plainNeed = (need: string | null) => {
+  const x = need?.replace(/^human: /, "").replace(/^a human controller$/, "a person");
+  return x ? x[0]!.toUpperCase() + x.slice(1) : null;
+};
 
 /** CLEAR_TO_LAND reads "clear to land". */
 const plain = (code?: string) => code?.replaceAll("_", " ").toLowerCase();
@@ -45,7 +61,7 @@ const safeAudio = (url?: string) => (url?.startsWith("/") && !url.startsWith("//
 
 export function FlightDetail({
   record, t, endT, live, playing, onSeek, onPlay, onLive, onClose,
-  closeLabel = "all flights", formatTime = clock, nameOf = (id) => id, action, controls, briefing,
+  closeLabel = "all flights", formatTime = clock, nameOf = (id) => id, action, controls, briefing, plain,
 }: FlightDetailProps) {
   const now = flightAt(record, t);
   // While live the server's summary is newer than the last recorded step.
@@ -76,12 +92,14 @@ export function FlightDetail({
 
       {briefing ?? <section className="fd-need">
         <div>
-          <small>{live ? "" : "then / "}{ATTENTION_WORDS[flight.attention]}</small>
-          <strong>{flight.need ?? (held ? "The agent will not act on this flight." : "Nothing needed right now")}</strong>
-          <p>
-            risk {Math.round(flight.risk.score)} {flight.risk.level}
-            {flight.risk.reasons.length > 0 && `: ${flight.risk.reasons.join(", ")}`}
-          </p>
+          <small>{live ? "" : "then / "}{(plain ? PLAIN_WORDS : ATTENTION_WORDS)[flight.attention]}</small>
+          <strong>{(plain ? plainNeed(flight.need) : flight.need) ?? (held ? "The agent will not act on this flight." : "Nothing needed right now")}</strong>
+          {!plain && (
+            <p>
+              risk {Math.round(flight.risk.score)} {flight.risk.level}
+              {flight.risk.reasons.length > 0 && `: ${flight.risk.reasons.join(", ")}`}
+            </p>
+          )}
         </div>
         {action}
       </section>}
